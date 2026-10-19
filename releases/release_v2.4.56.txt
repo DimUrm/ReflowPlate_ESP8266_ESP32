@@ -1,0 +1,6 @@
+Reflow Plate Firmware Release
+Version:     v2.4.56
+Date:        2026-10-16 12:26:30
+Description: Git: Merge branch 'main' of https://github.com/DimUrm/ReflowPlate_ESP8266
+------------------------------------------
+Binary: releases\firmware_v2.4.56.bin
