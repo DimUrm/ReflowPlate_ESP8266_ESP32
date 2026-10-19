@@ -1,6 +1,0 @@
-Reflow Plate Firmware Release
-Version:     v2.4.98
-Date:        2026-10-17 14:33:06
-Description: Git: update general
-------------------------------------------
-Binary: releases\firmware_v2.4.98.bin

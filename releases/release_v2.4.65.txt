@@ -1,6 +1,0 @@
-Reflow Plate Firmware Release
-Version:     v2.4.65
-Date:        2026-10-16 23:57:59
-Description: Git: Merge branch 'my-current-work' into update-menu-ota
-------------------------------------------
-Binary: releases\firmware_v2.4.65.bin
