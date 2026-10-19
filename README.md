@@ -66,22 +66,24 @@
 
 ### 🎛 Лицевая комбо-панель (Экран + Энкодер + Кнопки)
 Распиновка 9-контактной гребёнки с лицевой стороны слева направо:
+`[confirm] [oled_sda] [oled_scl] [enc_push] [enc_tpa] [enc_tpb] [bak] [gnd] [3v3-5v]`
+
+Куда паять шлейф панели в зависимости от выбранного микроконтроллера:
 
 ```text
-[confirm] [oled_sda] [oled_scl] [enc_push] [enc_tpa] [enc_tpb] [bak] [gnd] [3v3-5v]
-   │          │          │          │          │         │       │     │      │
-   ▼          ▼          ▼          ▼          ▼         ▼       ▼     ▼      ▼
-
-   Пин панели	Подключение к ESP32	Подключение к ESP8266
-confirm	GPIO 33	P3 (PCF8574)
-oled_sda	GPIO 21	D2 (GPIO4)
-oled_scl	GPIO 22	D1 (GPIO5)
-enc_push	GPIO 23	D7 (GPIO13)
-enc_tpa	GPIO 18	D5 (GPIO14)
-enc_tpb	GPIO 19	D6 (GPIO12)
-bak	GPIO 32	P2 (PCF8574)
-gnd	Общая земля GND	Общая земля GND
-3v3-5v	Шина питания 3.3V	Шина питания 3.3V
+┌──────────────────┬──────────────────────┬──────────────────────┐
+│ Пин панели       │ Подключение к ESP32  │ Подключение к ESP8266│
+├──────────────────┼──────────────────────┼──────────────────────┤
+│ confirm          │ GPIO 33              │ P3 (на PCF8574)      │
+│ oled_sda         │ GPIO 21 (SDA)        │ D2 (GPIO4, SDA)      │
+│ oled_scl         │ GPIO 22 (SCL)        │ D1 (GPIO5, SCL)      │
+│ enc_push         │ GPIO 23              │ D7 (GPIO13)          │
+│ enc_tpa          │ GPIO 18              │ D5 (GPIO14)          │
+│ enc_tpb          │ GPIO 19              │ D6 (GPIO12)          │
+│ bak              │ GPIO 32              │ P2 (на PCF8574)      │
+│ gnd              │ GND                  │ GND                  │
+│ 3v3-5v           │ 3.3V                 │ 3.3V                 │
+└──────────────────┴──────────────────────┴──────────────────────┘
 ---
 
 ##  Сборка и прошивка (PlatformIO)
