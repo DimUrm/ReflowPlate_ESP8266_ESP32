@@ -607,17 +607,16 @@ function uploadOTA() {
 
 // Общая загрузка прошивки: из выбранного файла или скачанной с GitHub (тогда передаётся MD5 для проверки на плате)
 function flashFile(file, md5) {
-  const formData = new FormData();
-  formData.append('update', file);
-
   $('ota_progress_box').style.display = 'block';
   $('ota_bar').style.width = '0%';
   $('ota_percent').textContent = '0%';
   $('ota_status').textContent = 'Uploading firmware...';
 
   const xhr = new XMLHttpRequest();
-  xhr.open('POST', '/update' + (md5 ? '?md5=' + md5 : ''), true);   // md5: плата сверит контрольную сумму
-  if (pin) xhr.setRequestHeader('X-PIN', pin); // Передаем PIN для безопасной прошивки!
+  xhr.open('POST', '/update' + (md5 ? '?md5=' + md5 : ''), true);
+  if (pin) xhr.setRequestHeader('X-PIN', pin);
+  xhr.setRequestHeader('Content-Type', 'application/octet-stream'); // Шлём чистый бинарник без обёрток формы
+
   xhr.upload.onprogress = function(e) {
     if (e.lengthComputable) {
       const p = Math.round((e.loaded / e.total) * 100);
@@ -625,9 +624,10 @@ function flashFile(file, md5) {
       $('ota_percent').textContent = p + '%';
     }
   };
+
   xhr.onload = function() {
-    if (xhr.status === 200 && xhr.responseText === 'OK') {   // плата отвечает 200 и при отказе (текст FAIL)
-      $('ota_status').innerHTML = '<b style="color:#00e676">Success! Rebooting ESP8266...</b>';
+    if (xhr.status === 200 && xhr.responseText === 'OK') {
+      $('ota_status').innerHTML = '<b style="color:#00e676">Success! Rebooting device...</b>';
       let sec = 5;
       setInterval(() => {
         $('ota_status').textContent = `Reconnecting in ${sec} sec...`;
@@ -635,12 +635,16 @@ function flashFile(file, md5) {
       }, 1000);
     } else {
       $('ota_status').innerHTML = xhr.status === 403
-        ? '<b style="color:#d32f2f">Wrong PIN: firmware rejected</b>'
-        : '<b style="color:#d32f2f">Firmware rejected (bad file, size or MD5)</b>';
+        ? '<b style="color:#d32f2f">Wrong PIN: rejected</b>'
+        : '<b style="color:#d32f2f">Firmware rejected: ' + (xhr.responseText || 'error') + '</b>';
     }
   };
-  xhr.onerror = function() { $('ota_status').innerHTML = '<b style="color:#d32f2f">Network Error during flash!</b>'; };
-  xhr.send(formData);
+
+  xhr.onerror = function() {
+    $('ota_status').innerHTML = '<b style="color:#d32f2f">Network Error during flash!</b>';
+  };
+
+  xhr.send(file); // Отправляем файл напрямую в теле запроса!
 }
 
 // ===== Обновление с GitHub: браузер скачивает прошивку по HTTPS (сертификат проверяет браузер), плата проверяет MD5 =====

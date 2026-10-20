@@ -1,3 +1,36 @@
+## [v2.4.131] (esp32dev - ESP32) — 2026-10-20 18:55:22
+- Git: Cleanup: ignore and stop tracking local build releases
+
+## [v2.4.130] (esp32dev - ESP32) — 2026-10-20 18:53:30
+- Git: Cleanup: ignore and stop tracking local build releases
+
+## [v2.4.129] (esp32dev - ESP32) — 2026-10-20 18:28:16
+- Git: Cleanup: ignore and stop tracking local build releases
+
+## [v2.4.128] (esp32dev - ESP32) — 2026-10-20 18:24:29
+- Git: Cleanup: ignore and stop tracking local build releases
+
+## [v2.4.127] (esp32dev - ESP32) — 2026-10-20 18:23:20
+- Git: Cleanup: ignore and stop tracking local build releases
+
+## [v2.4.126] (esp32dev - ESP32) — 2026-10-20 18:15:06
+- Git: Cleanup: ignore and stop tracking local build releases
+
+## [v2.4.125] (esp32dev - ESP32) — 2026-10-20 18:07:32
+- Git: Cleanup: ignore and stop tracking local build releases
+
+## [v2.4.123] (esp32dev - ESP32) — 2026-10-20 17:59:56
+- Git: Cleanup: ignore and stop tracking local build releases
+
+## [v2.4.122] (esp32dev - ESP32) — 2026-10-20 17:58:39
+- Git: Cleanup: ignore and stop tracking local build releases
+
+## [v2.4.121] (esp32dev - ESP32) — 2026-10-20 17:57:29
+- Git: Cleanup: ignore and stop tracking local build releases
+
+## [v2.4.120] (esp32dev - ESP32) — 2026-10-20 17:24:21
+- Git: Cleanup: ignore and stop tracking local build releases
+
 ## [v2.4.118] — 2026-10-19 23:45:24
 - Что будет уметь веб-консоль:
 Живой лог: системные события, подключения Wi-Fi, смена фаз пайки, автотюн, температура и ошибки.

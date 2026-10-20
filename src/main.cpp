@@ -1271,64 +1271,74 @@ void setup() {
     r->send(response);
   });
 
-  server.on("/update", HTTP_POST, [](AsyncWebServerRequest *request) {
-    const AsyncWebHeader* h = request->getHeader("X-PIN");
-    if (web_pin[0] && (!h || h->value() != web_pin)) {
-      request->send(403, "text/plain", "FORBIDDEN: Wrong PIN");
-      return;
-    }
-    ota_percent = Update.hasError() ? -1 : 100;       // экран возвращается в обычный режим, либо показывает 100% до перезагрузки
-    request->send(200, "text/plain", Update.hasError() ? "FAIL" : "OK");
-    restart_at = millis() + 1000;
-  }, [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
-    const AsyncWebHeader* h = request->getHeader("X-PIN");
-    if (web_pin[0] && (!h || h->value() != web_pin)) {
-      return;
-    }
-    if (!index) {
-      stopHeating();
-#if defined(ESP8266)
-      Update.runAsync(true);
-      uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & ~0xFFF;
-      if (!Update.begin(maxSketchSpace)) {
+  // ================= НАДЁЖНЫЙ RAW BINARY OTA ОБРАБОТЧИК =================
+  server.on("/update", HTTP_POST, 
+    [](AsyncWebServerRequest *request) {
+      bool failed = Update.hasError();
+      if (failed) {
+        Serial.print(F("[OTA] Failed: "));
         Update.printError(Serial);
       }
-#elif defined(ESP32)
-      if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
-        Update.printError(Serial);
+      request->send(200, "text/plain", failed ? "FAIL" : "OK");
+      if (!failed) restart_at = millis() + 1000;
+    },
+    NULL, // onUpload (не нужен для raw body)
+    [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+      // Проверка PIN-кода через заголовок
+      const AsyncWebHeader* h = request->getHeader("X-PIN");
+      if (web_pin[0] && (!h || h->value() != web_pin)) {
+        return;
       }
-#endif
-      const AsyncWebParameter* pm = request->getParam("md5");
-      if (pm && pm->value().length() == 32) Update.setMD5(pm->value().c_str());
-      resetActivityTimer();
-      ota_percent = 0;
-    }
-    if (!Update.hasError()) {
-      if (Update.write(data, len) != len) {
-        Update.printError(Serial);
+
+      if (!index) {
+        stopHeating();
+        Serial.printf("[OTA] Start raw binary upload. Total size: %u bytes\n", total);
+        
+        uint32_t maxSpace = ESP.getFreeSketchSpace();
+        if (total > maxSpace) {
+          Serial.println(F("[OTA] Error: File is too large for free sketch space!"));
+          return;
+        }
+
+        if (!Update.begin(total, U_FLASH)) {
+          Serial.print(F("[OTA] Begin error: "));
+          Update.printError(Serial);
+          return;
+        }
+
+        // Проверка MD5 из заголовка (если передано от GitHub)
+        const AsyncWebParameter* pm = request->getParam("md5");
+        if (pm && pm->value().length() == 32) {
+          Update.setMD5(pm->value().c_str());
+        }
+        resetActivityTimer();
+        ota_percent = 0;
       }
-    }
-    ota_last_chunk = millis();
-    if (request->contentLength()) {
-      int pct = (int)(((uint64_t)(index + len) * 100ULL) / request->contentLength());
-      ota_percent = pct > 99 ? 99 : pct;
-    }
-    if (final) {
-#if defined(ESP32)
-      if (Update.end()) { // Без true на ESP32!
-        Serial.printf("[OTA] Success: %u B. Rebooting...\n", index + len);
-      } else {
-        Update.printError(Serial);
+
+      if (!Update.hasError() && len > 0) {
+        if (Update.write(data, len) != len) {
+          Serial.print(F("[OTA] Write error: "));
+          Update.printError(Serial);
+        }
       }
-#else
-      if (Update.end(true)) {
-        Serial.printf("[OTA] Success: %u B. Rebooting...\n", index + len);
-      } else {
-        Update.printError(Serial);
+
+      ota_last_chunk = millis();
+      if (total > 0) {
+        int pct = (int)(((uint64_t)(index + len) * 100ULL) / total);
+        ota_percent = pct > 99 ? 99 : pct;
       }
-#endif
+
+      if (index + len == total) {
+        if (Update.end(true)) {
+          Serial.printf("[OTA] Success! Transferred %u B. Rebooting...\n", total);
+        } else {
+          Serial.print(F("[OTA] End error: "));
+          Update.printError(Serial);
+        }
+      }
+      yield(); // Договариваемся со стеком TCP и FreeRTOS, чтобы соединение не рвалось при записи во Flash!
     }
-  });
+  );
 
   server.onNotFound([](AsyncWebServerRequest *r) { r->send(404, "text/plain", "Not found"); });
   server.begin();
@@ -1340,6 +1350,12 @@ void setup() {
 void loop() {
   uint32_t now = millis();
   ws.cleanupClients();
+
+  // ВО ВРЕМЯ ПРОШИВКИ (OTA) ЗАМОРАЖИВАЕМ ВСЕ ТОРМОЗЯЩИЕ ЗАДАЧИ!
+  if (ota_percent >= 0) {
+    delay(1);
+    return;
+  }
 
   buzzer.tick(now);
   checkWifiScanResults(); // Проверка асинхронного скана сетей

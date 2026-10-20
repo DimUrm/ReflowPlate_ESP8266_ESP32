@@ -13,3 +13,4 @@ releases/*.bin
 # Системные файлы
 .DS_Store
 Thumbs.db
+releases/
