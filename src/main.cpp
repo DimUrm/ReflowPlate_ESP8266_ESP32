@@ -26,6 +26,12 @@
 #include "profile.h"
 #include "web_index_gz.h"
 
+#if defined(DISPLAY_ST7789) && defined(ESP32)
+  #include "display_st7789.h"
+#else
+  Adafruit_SSD1306 display(128, 64, &Wire, -1);
+#endif
+
 // ================= ДРАЙВЕР РАСШИРИТЕЛЯ PCF8574 =================
 uint8_t pcf_address = 0;
 bool pcf_found = false;
@@ -95,7 +101,7 @@ uint32_t lifetime_heat_min = 0;
 uint32_t reflow_cycles_count = 0;
 uint32_t last_energy_calc = 0;
 
-Adafruit_SSD1306 display(128, 64, &Wire, -1);
+//Adafruit_SSD1306 display(128, 64, &Wire, -1);
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 WiFiClient espClient;
@@ -144,7 +150,12 @@ void IRAM_ATTR isrEncoder() {
 void resetActivityTimer() {
   last_activity_time = millis();
   if (oled_sleeping && oled_ok) {
+#if defined(DISPLAY_ST7789) && defined(ESP32)
+    tft.enableSleep(false);
+    tft.enableDisplay(true);
+#else
     display.ssd1306_command(SSD1306_DISPLAYON);
+#endif
     oled_sleeping = false;
     drawOled();
     forceTele = true;
@@ -712,24 +723,61 @@ void pollInputs(uint32_t now) {
 bool i2cPresent(uint8_t a) { Wire.beginTransmission(a); return Wire.endTransmission() == 0; }
 
 bool initOled() {
-  const uint8_t addrs[2] = {0x3C, 0x3D};
-  for (uint8_t i = 0; i < 2; i++) {
-    if (!i2cPresent(addrs[i])) continue;
-    if (display.begin(SSD1306_SWITCHCAPVCC, addrs[i], true, false)) {
-      display.clearDisplay();
-      display.setTextColor(SSD1306_WHITE);
-      display.display();
-      return true;
-    }
+#if defined(DISPLAY_ST7789) && defined(ESP32)
+  // Если в config.h выбран цветной экран ST7789 на ESP32 — запускаем цветной IPS:
+  return initTFT();
+#else
+  // ВЕСЬ ВАШ ПРОВЕРЕННЫЙ КОД ДЛЯ GM009605/SSD1315 СОХРАНЁН НА 100%:
+  Serial.println(F("[OLED] Starting GM009605 on ESP32..."));
+
+  // 1. Даем 200 мс конденсатору автосброса на платке GM009605 полностью зарядиться!
+  delay(200);
+
+  // 2. Инициализация дисплея
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println(F("[OLED] Allocation or I2C fail!"));
+    return false;
   }
-  return false;
+
+  // 3. Принудительный перезапуск помпы накачки питания матрицы (специфика SSD1315/GM009605)
+  Wire.beginTransmission(0x3C);
+  Wire.write(0x00); // Режим команд
+  Wire.write(0x8D); // Команда Charge Pump
+  Wire.write(0x14); // 0x14 = включить генератор 7.5V
+  Wire.write(0xAF); // 0xAF = включить экран (Display ON)
+  Wire.write(0x81); // Контраст
+  Wire.write(0xFF); // Максимальная яркость
+  Wire.endTransmission();
+
+  delay(20);
+
+  // 4. Тестовый вывод текста
+  display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
+  display.setTextSize(2);
+  display.setCursor(10, 24);
+  display.print("REFLOW OK");
+  display.display();
+
+  Serial.println(F("[OLED] GM009605 Initialized and ignited!"));
+  return true;
+#endif
 }
 
 void drawOled() {
   if (!oled_ok || oled_sleeping) return;
-  if (ota_percent >= 0) { drawOtaProgress(); return; }   // идёт обновление прошивки
-  if (menuActive()) { menuDraw(); return; }               // меню энкодера
+
+#if defined(DISPLAY_ST7789) && defined(ESP32)
+  if (ota_percent >= 0) { drawOtaST7789(ota_percent); return; }
+  drawUI_ST7789(temp_f, target_temp, output_power, is_heating, ssr_on, 
+                fan_active, profile.name, PHASE_NAMES[profile.current_phase], 
+                fault, buzzer.mute, oled_sleeping, temp_valid);
+  return; // Выходим: цветной кадр 240x135 уже нарисован!
+#else
+  if (ota_percent >= 0) { drawOtaProgress(); return; }
+  if (menuActive()) { menuDraw(); return; }
   display.clearDisplay();
+#endif
 
   display.setTextSize(1);
   display.setCursor(2, 2);
@@ -819,8 +867,50 @@ void handleConsoleCommand(const String& cmd_raw) {
   cmd.toLowerCase();
 
   if (cmd == "help") {
-    consoleLog("[CMD] Available: help, status, reboot, stop, fan on/off, mute on/off, target <temp>, scan");
+    consoleLog("[CMD] Available: help, status, reboot, stop, fan on/off, mute on/off, target <temp>, scan, i2cscan, oledtest, oledsh");
   } 
+  else if (cmd == "i2c" || cmd == "i2cscan") {
+    consoleLog("[I2C] Scanning bus (SDA=GPIO" + String(PIN_I2C_SDA) + ", SCL=GPIO" + String(PIN_I2C_SCL) + ")...");
+    uint8_t count = 0;
+    for (uint8_t addr = 1; addr < 127; addr++) {
+      Wire.beginTransmission(addr);
+      if (Wire.endTransmission() == 0) {
+        String dev = "Unknown Device";
+        if (addr == 0x3C || addr == 0x3D) dev = "OLED Display (SSD1306/SH1106)";
+        else if (addr >= 0x20 && addr <= 0x27) dev = "PCF8574 I/O Expander";
+        else if (addr >= 0x38 && addr <= 0x3F) dev = "PCF8574A I/O Expander";
+        else if (addr == 0x68) dev = "DS3231 RTC Clock";
+        
+        char b[64];
+        snprintf(b, sizeof(b), " -> Found: 0x%02X [%s]", addr, dev.c_str());
+        consoleLog(b);
+        count++;
+      }
+    }
+    consoleLog("[I2C] Scan complete. Total devices: " + String(count));
+  }
+  else if (cmd == "oledtest") {
+    consoleLog("[OLED] Running hardware fill test (White screen, Contrast 255)...");
+    display.ssd1306_command(SSD1306_DISPLAYON);
+    display.ssd1306_command(SSD1306_SETCONTRAST);
+    display.ssd1306_command(0xFF); // Максимальная яркость
+    display.fillScreen(SSD1306_WHITE); // Заливаем все пиксели
+    display.display();
+    consoleLog("[OLED] Sent. Did the screen light up white?");
+  }
+  else if (cmd == "oledsh") {
+    consoleLog("[OLED] Forcing SH1106 (1.3 inch) initialization sequence...");
+    // Специфические команды помпы и адресации для SH1106
+    display.ssd1306_command(0xAE); // Display OFF
+    display.ssd1306_command(0xAD); // Charge pump command SH1106
+    display.ssd1306_command(0x8B); // Charge pump ON
+    display.ssd1306_command(0x81); // Contrast
+    display.ssd1306_command(0xFF); // Max
+    display.ssd1306_command(0xAF); // Display ON
+    display.fillScreen(SSD1306_WHITE);
+    display.display();
+    consoleLog("[OLED] SH1106 sequence sent.");
+  }
   else if (cmd == "status") {
     char buf[128];
     snprintf(buf, sizeof(buf), "[STATUS] T: %.1fC | Set: %.0fC | Heap: %u B | Uptime: %lu s | SSR: %s", 
@@ -1224,8 +1314,13 @@ void setup() {
   pinMode(PIN_ENC_SW, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(PIN_ENC_CLK), isrEncoder, FALLING);
 
+  #if defined(DISPLAY_ST7789) && defined(ESP32)
+  oled_ok = initTFT();
+  Serial.printf("[TFT] ST7789 Color IPS (240x135): %s\n", oled_ok ? "INITIALIZED OK" : "NOT FOUND");
+  if (oled_ok) drawSplashST7789();
+#else
   Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
-  Wire.setClock(100000); // 100 кГц: железная стабильность на ESP32!
+  Wire.setClock(100000);
 
   // --- Диагностический I2C Сканер ---
   Serial.printf("[I2C] Scanning bus (SDA=GPIO%d, SCL=GPIO%d)...\n", PIN_I2C_SDA, PIN_I2C_SCL);
@@ -1237,13 +1332,11 @@ void setup() {
       found_devices++;
     }
   }
-  if (!found_devices) {
-    Serial.println(F("[I2C] WARNING: No I2C devices detected! Check wiring and pull-ups."));
-  }
 
   oled_ok = initOled();
   Serial.printf("[OLED] Display status: %s\n", oled_ok ? "INITIALIZED OK" : "NOT FOUND");
-  if (oled_ok) drawSplash();   // заставка с версией прошивки (около 1.5 с, нагрев в это время выключен)
+  if (oled_ok) drawSplash();
+#endif
 
   #if defined(ESP32)
   pinMode(PIN_FAN, OUTPUT);
@@ -1280,7 +1373,8 @@ void setup() {
         Update.printError(Serial);
       }
       request->send(200, "text/plain", failed ? "FAIL" : "OK");
-      if (!failed) restart_at = millis() + 1000;
+      ota_percent = -1; // СНИМАЕМ БЛОКИРОВКУ С LOOP!
+      if (!failed) restart_at = millis() + 600;
     },
     NULL, // onUpload (не нужен для raw body)
     [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
@@ -1351,6 +1445,19 @@ void loop() {
   uint32_t now = millis();
   ws.cleanupClients();
 
+  // ПЕРЕЗАГРУЗКА ИМЕЕТ НАИВЫСШИЙ ПРИОРИТЕТ:
+  if (restart_at && now > restart_at) { 
+    digitalWrite(PIN_SSR, LOW);
+    Serial.println(F("[SYS] Rebooting NOW..."));
+    Serial.flush();
+    #if defined(ESP8266)
+      ESP.reset(); // Железный аппаратный сброс ROM-загрузчика на ESP8266
+    #else
+      ESP.restart();
+    #endif
+  }
+
+  ws.cleanupClients();
   // ВО ВРЕМЯ ПРОШИВКИ (OTA) ЗАМОРАЖИВАЕМ ВСЕ ТОРМОЗЯЩИЕ ЗАДАЧИ!
   if (ota_percent >= 0) {
     delay(1);
@@ -1362,7 +1469,6 @@ void loop() {
 
   if (cfg_save)     { cfg_save = false; saveConfig(); }
   if (apply_sensor) { apply_sensor = false; applySensor(); }
-  if (restart_at && now > restart_at) { digitalWrite(PIN_SSR, LOW); ESP.restart(); }
 
   pollInputs(now);
   menuTick(now);
@@ -1372,9 +1478,14 @@ void loop() {
     if (!oled_ok && now - oled_probe > 10000) { oled_probe = now; oled_ok = initOled(); }
 
     if (!is_heating && !profile.is_active && temp_f < 50.0f && !oled_sleeping &&
-        (now - last_activity_time > 15UL * 60UL * 1000UL)) {      // не гасим экран над горячей плитой и во время профиля
+        (now - last_activity_time > 15UL * 60UL * 1000UL)) {
       if (oled_ok) {
+#if defined(DISPLAY_ST7789) && defined(ESP32)
+        tft.enableDisplay(false);
+        tft.enableSleep(true);
+#else
         display.ssd1306_command(SSD1306_DISPLAYOFF);
+#endif
         oled_sleeping = true;
       }
     }

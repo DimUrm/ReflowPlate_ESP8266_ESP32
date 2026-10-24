@@ -1,6 +1,16 @@
 #pragma once
 #include <Arduino.h>
 
+// ================= ВЫБОР ТИПА ДИСПЛЕЯ =================
+// Для ESP8266 всегда используется OLED (SSD1306/SH1106).
+// Для ESP32 можно выбрать либо монохромный OLED, либо цветной TFT ST7789:
+#if defined(ESP32)
+  #define DISPLAY_ST7789       // Раскомментировано: Цветной IPS 1.14" 240x135
+  //#define DISPLAY_SSD1306    // Закомментировано: Монохромный OLED 128x64
+#else
+  #define DISPLAY_SSD1306      // На ESP8266 всегда OLED
+#endif
+
 // ================= КРОССПЛАТФОРМЕННЫЕ ПИНЫ =================
 #if defined(ESP8266)
   #define PIN_SSR       D8   // GPIO15 (Твердотельное реле 220V)
@@ -30,10 +40,17 @@
   #define PIN_MAX_CS    4    // GPIO4  (MAX6675 CS)
   #define PIN_MAX_SCK   17   // GPIO17 (MAX6675 SCK)
 
-  #define PIN_I2C_SDA   21   // GPIO21 (Стандартный SDA на ESP32)
-  #define PIN_I2C_SCL   22   // GPIO22 (Стандартный SCL на ESP32)
+  #define PIN_I2C_SDA   21   // GPIO21 (I2C SDA для OLED)
+  #define PIN_I2C_SCL   22   // GPIO22 (I2C SCL для OLED)
 
-  // На ESP32 пины свободные -> подключаем напрямую без PCF8574!
+  // Пины для цветного дисплея 1.14" ST7789 (4-Wire SPI)
+  #define PIN_TFT_SCLK  14   // GPIO14 (SPI Clock)
+  #define PIN_TFT_MOSI  13   // GPIO13 (SPI Data / MOSI)
+  #define PIN_TFT_CS    5    // GPIO5  (Chip Select)
+  #define PIN_TFT_DC    21   // GPIO21 (Data / Command)
+  #define PIN_TFT_RST   22   // GPIO22 (Reset дисплея)
+  #define PIN_TFT_BL    -1   // Подсветка подключена к 3.3V
+
   #define PIN_FAN       27   // GPIO27 (Мосфет вентилятора)
   #define PIN_BTN_BACK  32   // GPIO32 (Кнопка Back)
   #define PIN_BTN_CONF  33   // GPIO33 (Кнопка Confirm)

@@ -1,3 +1,18 @@
+## [v2.4.145] (esp32dev - ESP32) — 2026-10-23 14:46:53
+- Git: Fix local OTA upload using raw binary onBody stream and optimize Wi-Fi stability
+
+## [v2.4.136] (esp32dev - ESP32) — 2026-10-21 20:49:39
+- Git: Fix local OTA upload using raw binary onBody stream and optimize Wi-Fi stability
+
+## [v2.4.135] (esp32dev - ESP32) — 2026-10-21 20:47:51
+- Git: Fix local OTA upload using raw binary onBody stream and optimize Wi-Fi stability
+
+## [v2.4.134] (esp32dev - ESP32) — 2026-10-21 20:25:32
+- Git: Fix local OTA upload using raw binary onBody stream and optimize Wi-Fi stability
+
+## [v2.4.133] (esp32dev - ESP32) — 2026-10-21 20:13:48
+- Git: Fix local OTA upload using raw binary onBody stream and optimize Wi-Fi stability
+
 ## [v2.4.131] (esp32dev - ESP32) — 2026-10-20 18:55:22
 - Git: Cleanup: ignore and stop tracking local build releases
 
