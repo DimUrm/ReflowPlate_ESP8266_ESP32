@@ -58,7 +58,7 @@ public:
     last_countdown_sec = -1;
   }
 
-  void tick(uint32_t now, float current_temp, float &target_out, bool &heater_enable, bool &fan_request) {
+  void tick(uint32_t now, float current_temp, float &target_out, bool &heater_enable, uint8_t &fan_speed_pct) {
     if (!is_active) return;
     uint32_t elapsed = now - phase_start;
 
@@ -123,12 +123,21 @@ public:
 
       case PHASE_COOLDOWN:
         heater_enable = false;
-        fan_request = true; // Включаем обдув!
         target_out = 0;
+
+        // Трехступенчатое безопасное охлаждение по JEDEC:
+        if (current_temp > 160.0f) {
+          fan_speed_pct = 35;   // 1) Выше 160°C — бережный обдув против растрескивания MLCC
+        } else if (current_temp > 90.0f) {
+          fan_speed_pct = 65;   // 2) 160°C..90°C — умеренное охлаждение
+        } else {
+          fan_speed_pct = 100;  // 3) Ниже 90°C — максимальный продув стола
+        }
+
         if (current_temp <= 45.0f) {
           current_phase = PHASE_IDLE;
           is_active = false;
-          fan_request = false;
+          fan_speed_pct = 0;
           buzzer.play(SND_COOLED);
         }
         break;
