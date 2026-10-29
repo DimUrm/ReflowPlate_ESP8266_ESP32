@@ -78,13 +78,13 @@ public:
 
       case SND_FAULT:
         if (sound_step % 2 == 0) {
-          if (dt == 0) playTone(1200); // Включаем тон только ОДИН РАЗ на входе в шаг
+          if (dt == 0) playTone(1200);
           if (dt > 250) { stopTone(); sound_step++; sound_step_time = now; }
         } else {
           if (dt > 150) {
             sound_step++; sound_step_time = now;
             if (sound_step >= 6) current_sound = SND_NONE;
-            else playTone(1200); // Запуск следующего гудка
+            else playTone(1200);
           }
         }
         break;
