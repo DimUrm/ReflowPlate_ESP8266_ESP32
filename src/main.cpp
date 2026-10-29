@@ -988,7 +988,7 @@ void handleConsoleCommand(const String& cmd_raw) {
   else if (cmd == "oledtest") {
 #if (defined(DISPLAY_ST7789) || defined(DISPLAY_NOKIA5110)) && defined(ESP32)
     consoleLog("[OLED] Command unavailable: SPI Display is active.");
-#els
+#else
     consoleLog("[OLED] Running hardware fill test (White screen, Contrast 255)...");
     display.ssd1306_command(SSD1306_DISPLAYON);
     display.ssd1306_command(SSD1306_SETCONTRAST);
