@@ -26,7 +26,7 @@ canvas{width:100%;height:180px;display:block;background:#181818;border-radius:6p
 .status-box{background:#181818;padding:10px;border-radius:8px;margin:8px 0;font-size:13px;border-left:4px solid #00e676}
 details{background:#252525;padding:10px;border-radius:8px;margin:8px 0;cursor:pointer}
 summary{font-weight:bold;color:#ff5722}
-table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
+table{width:100%;border-collapse:collapse;margin-top:8px;font-size:12px}
 th,td{border:1px solid #444;padding:6px;text-align:left}
 th{background:#333;color:#ff5722}
 
@@ -44,7 +44,7 @@ th{background:#333;color:#ff5722}
   <button class="tab-btn" onclick="tab(3)">📖 Info & OTA</button>
 </div>
 
-<!-- ВКЛАДКА 1 -->
+<!-- ВКЛАДКА 1: УПРАВЛЕНИЕ -->
 <div id="t0" class="tab-content active">
   <div class="card" style="text-align:center">
     <h1>Reflow Plate</h1>
@@ -74,22 +74,31 @@ th{background:#333;color:#ff5722}
   <div class="card"><canvas id="c"></canvas></div>
 </div>
 
-<!-- ВКЛАДКА 2 -->
+<!-- ВКЛАДКА 2: ПРОФИЛИ И ПОДОГРЕВАТЕЛЬ -->
 <div id="t1" class="tab-content">
   <div class="card">
-    <h3>🚀 Auto Reflow Curves (JEDEC)</h3>
-    <button class="preset" onclick="startProf('Sn63', 150, 165, 60, 215, 25)">
-      <b>🥫 Leaded Sn63Pb37 Auto Cycle</b><br>
-      <small style="color:#aaa">Preheat 150&deg;C &rarr; Soak 165&deg;C (60s) &rarr; Peak 215&deg;C (25s) &rarr; Cool</small>
+    <h3>🚀 JEDEC Reflow Profiles</h3>
+    <button class="preset" onclick="runProf(0)">
+      <b>🥫 Sn63Pb37 Leaded Auto-Cycle</b><br>
+      <small style="color:#aaa">Preheat 150&deg;C &rarr; Soak 165&deg;C (60s) &rarr; Peak 215&deg;C (25s) &rarr; JEDEC Cool</small>
     </button>
-    <button class="preset" onclick="startProf('LeadFree', 160, 180, 75, 235, 30)">
-      <b>✨ Lead-Free SAC305 Auto Cycle</b><br>
-      <small style="color:#aaa">Preheat 160&deg;C &rarr; Soak 180&deg;C (75s) &rarr; Peak 235&deg;C (30s) &rarr; Cool</small>
+    <button class="preset" onclick="runProf(1)">
+      <b>✨ Lead-Free SAC305 Auto-Cycle</b><br>
+      <small style="color:#aaa">Preheat 160&deg;C &rarr; Soak 180&deg;C (75s) &rarr; Peak 235&deg;C (30s) &rarr; JEDEC Cool</small>
     </button>
-    <h3 style="margin-top:15px">⚡ Manual Presets</h3>
+    <button class="preset" onclick="runProf(2)">
+      <b>❄️ Low-Temp Bi58 Auto-Cycle</b><br>
+      <small style="color:#aaa">Preheat 100&deg;C &rarr; Soak 120&deg;C (45s) &rarr; Peak 165&deg;C (20s) &rarr; JEDEC Cool</small>
+    </button>
+
+    <h3 style="margin-top:16px">🛠 Repair & Preheater Modes (Auto-Timer)</h3>
     <div style="display:flex;gap:6px">
-      <button class="sm preset" style="text-align:center" onclick="setPreset(80, 'Phone')">📱 Phone (80&deg;)</button>
-      <button class="sm preset" style="text-align:center" onclick="setPreset(150, 'LED')">💡 LED (150&deg;)</button>
+      <button class="preset sm" style="flex:1;text-align:center" onclick="startPreheat(80, 15)">
+        📱 <b>Phone 80&deg;C</b><br><small style="color:#aaa">Screen Separator (15 min)</small>
+      </button>
+      <button class="preset sm" style="flex:1;text-align:center" onclick="startPreheat(110, 20)">
+        🛠 <b>PCB 110&deg;C</b><br><small style="color:#aaa">Bottom Preheater (20 min)</small>
+      </button>
     </div>
   </div>
 
@@ -98,11 +107,12 @@ th{background:#333;color:#ff5722}
     <label>Sensor Hardware</label>
     <select id="sn">
       <option value="auto">Auto (MAX6675, else simulation)</option>
-      <option value="max">MAX6675 thermocouple</option>
-      <option value="ntc">NTC 100k on A0</option>
+      <option value="max">MAX6675 Thermocouple</option>
+      <option value="ntc">NTC 100k (A0 / GPIO36)</option>
       <option value="sim">Simulation (Virtual plate)</option>
     </select>
     <button class="save sm" onclick="send({a:'sensor',v:$('sn').value})">Apply sensor</button>
+    
     <label>Kp (%/&deg;C)</label><input id="kp" type="number" step="any">
     <label>Ki (%/&deg;C&middot;s)</label><input id="ki" type="number" step="any">
     <label>Kd (%&middot;s/&deg;C)</label><input id="kd" type="number" step="any">
@@ -123,10 +133,10 @@ th{background:#333;color:#ff5722}
       <option value="15">15 Minutes</option>
       <option value="30">30 Minutes</option>
     </select>
-    </div>
+  </div>
 </div>
 
-<!-- ВКЛАДКА 3 -->
+<!-- ВКЛАДКА 3: СЕТЬ И MQTT -->
 <div id="t2" class="tab-content">
   <div class="card">
     <h3>Wi-Fi Setup</h3>
@@ -147,7 +157,7 @@ th{background:#333;color:#ff5722}
   </div>
 
   <div class="card">
-    <h3>MQTT Broker</h3>
+    <h3>MQTT Home Assistant</h3>
     <label><input type="checkbox" id="en" style="width:auto"> Enable MQTT</label>
     <label>Server IP / Host</label><input id="srv" type="text">
     <label>Port</label><input id="prt" type="number">
@@ -159,10 +169,10 @@ th{background:#333;color:#ff5722}
   </div>
 </div>
 
-<!-- ВКЛАДКА 4 -->
+<!-- ВКЛАДКА 4: СТАТИСТИКА, СПРАВКА И OTA -->
 <div id="t3" class="tab-content">
   <div class="card">
-    <h3>📊 Usage & Energy Statistics</h3>
+    <h3>📊 Statistics & Energy</h3>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;text-align:center">
       <div style="background:#252525;padding:8px;border-radius:6px">
         <small style="color:#aaa">Energy (Session)</small><br>
@@ -190,63 +200,47 @@ th{background:#333;color:#ff5722}
   <div class="card">
     <h3>Hardware Pinout & Help</h3>
     <details open>
-      <summary>1. Основные подключения NodeMCU (ESP8266)</summary>
+      <summary>1. Распиновка ESP32 DevKit (Прямое подключение)</summary>
       <table>
-        <tr><th>Периферия</th><th>Пин NodeMCU</th><th>GPIO</th><th>Примечание</th></tr>
-        <tr><td>SSR Реле (220V)</td><td><b>D8</b></td><td>GPIO15</td><td>Медленный ШИМ (окно 1 сек)</td></tr>
-        <tr><td>Зуммер (Buzzer)</td><td><b>RX</b></td><td>GPIO3</td><td>ШИМ генератор tone()</td></tr>
-        <tr><td>MAX6675 SO</td><td><b>D3</b></td><td>GPIO0</td><td>SPI Data (MISO)</td></tr>
-        <tr><td>MAX6675 CS</td><td><b>D4</b></td><td>GPIO2</td><td>SPI Chip Select</td></tr>
-        <tr><td>MAX6675 SCK</td><td><b>D0</b></td><td>GPIO16</td><td>SPI Clock</td></tr>
-        <tr><td>Энкодер CLK</td><td><b>D5</b></td><td>GPIO14</td><td>Прерывание вращения</td></tr>
-        <tr><td>Энкодер DT</td><td><b>D6</b></td><td>GPIO12</td><td>Направление вращения</td></tr>
-        <tr><td>Энкодер Кнопка</td><td><b>D7</b></td><td>GPIO13</td><td>Старт / Стоп нагрева</td></tr>
-        <tr><td>I2C Шина SDA</td><td><b>D2</b></td><td>GPIO4</td><td>Общая шина: OLED + PCF8574</td></tr>
-        <tr><td>I2C Шина SCL</td><td><b>D1</b></td><td>GPIO5</td><td>Общая шина: OLED + PCF8574</td></tr>
-        <tr><td>NTC Термистор</td><td><b>A0</b></td><td>ADC0</td><td>Аналоговый делитель 100k на GND</td></tr>
+        <tr><th>Периферия</th><th>GPIO</th><th>Тип</th><th>Примечание</th></tr>
+        <tr><td>SSR Реле 220V</td><td><b>GPIO 25</b></td><td>Out</td><td>Стяжка 10к к GND обязательна!</td></tr>
+        <tr><td>Кулер обдува (Fan)</td><td><b>GPIO 27</b></td><td>PWM</td><td>Аппаратный ШИМ 5 кГц (JEDEC)</td></tr>
+        <tr><td>Кнопка BACK</td><td><b>GPIO 32</b></td><td>In</td><td>Замыкает на GND (Pull-up)</td></tr>
+        <tr><td>Кнопка CONFIRM</td><td><b>GPIO 33</b></td><td>In</td><td>Замыкает на GND (6 пресетов)</td></tr>
+        <tr><td>Зуммер (Buzzer)</td><td><b>GPIO 26</b></td><td>PWM</td><td>ШИМ LEDC Канал 0</td></tr>
+        <tr><td>MAX6675 (SO/CS/SCK)</td><td><b>16 / 4 / 17</b></td><td>SPI</td><td>Термопара K-типа</td></tr>
+        <tr><td>Энкодер (CLK/DT/SW)</td><td><b>18 / 19 / 23</b></td><td>In</td><td>Удержание SW = Меню на OLED</td></tr>
+        <tr><td>SPI Дисплей (CLK/MOSI)</td><td><b>14 / 13</b></td><td>SPI</td><td>ST7789 Color / Nokia 5110</td></tr>
+        <tr><td>SPI Дисплей (CS/DC/RST)</td><td><b>5 / 21 / 22</b></td><td>Out</td><td>ST7789 Color / Nokia 5110</td></tr>
+        <tr><td>NTC Термистор</td><td><b>GPIO 36</b></td><td>ADC</td><td>Строго ADC1! Делитель 4.7к к 3.3V</td></tr>
       </table>
-    </details>
-
-    <details open>
-      <summary>2. Расширитель портов PCF8574 (I2C: 0x20 / 0x27 / 0x38)</summary>
-      <table>
-        <tr><th>Пин PCF8574</th><th>Назначение</th><th>Функция при нажатии</th><th>Схема подключения</th></tr>
-        <tr><td><b>P0</b></td><td>Кулер охлаждения (Fan)</td><td>Выход: Обдув стола</td><td>N-Ch MOSFET к GND кулера</td></tr>
-        <tr><td><b>P1</b></td><td>Вытяжка дыма / Свет</td><td>Выход: Резерв</td><td>Реле или N-Ch MOSFET</td></tr>
-        <tr><td><b>P2</b></td><td>Кнопка <b>BACK</b></td><td>Вход: Стоп ТЭНа / Обдув / Сброс Fault</td><td>Кнопка замыкает <b>P2 на GND</b> (Pull-up внутри)</td></tr>
-        <tr><td><b>P3</b></td><td>Кнопка <b>CONFIRM</b></td><td>Вход: Быстрая смена профилей по кругу</td><td>Кнопка замыкает <b>P3 на GND</b> (Pull-up внутри)</td></tr>
-        <tr><td><b>P4 - P7</b></td><td>Свободный резерв</td><td>Входы / Выходы</td><td>Доступны на гребенке платы</td></tr>
-      </table>
-      <div style="font-size:12px;color:#aaa;margin-top:6px;background:#181818;padding:6px;border-radius:4px">
-        💡 <i>Подключение кнопок платки:</i> Один контакт кнопки "Back" &rarr; на <b>P2</b>. Один контакт кнопки "Confirm" &rarr; на <b>P3</b>. Общие вторые контакты обеих кнопок &rarr; на <b>GND</b>. Внешние резисторы не нужны (в PCF8574 встроена подтяжка).
-      </div>
     </details>
 
     <details>
-      <summary>Шпаргалка: Как настраивать ПИД (PID Tuning)</summary>
-      <div style="font-size:13px;line-height:1.5;color:#ccc;margin-top:8px">
-        <p><b>1. Kp (Реакция / Газ):</b> Основная мощность. Чем толще алюминий, тем выше Kp.<br>
-        • <i>Слишком мало:</i> Нагрев идет слишком медленно.<br>
-        • <i>Слишком много:</i> Будет постоянный перелет и колебания температуры.</p>
+      <summary>2. Распиновка NodeMCU v2 (ESP8266 + PCF8574)</summary>
+      <table>
+        <tr><th>Периферия</th><th>Пин платы</th><th>GPIO / Порт</th></tr>
+        <tr><td>SSR Реле 220V</td><td><b>D8</b></td><td>GPIO 15</td></tr>
+        <tr><td>Зуммер (Buzzer)</td><td><b>RX</b></td><td>GPIO 3</td></tr>
+        <tr><td>MAX6675 (SO/CS/SCK)</td><td><b>D3 / D4 / D0</b></td><td>GPIO 0 / 2 / 16</td></tr>
+        <tr><td>Энкодер (CLK/DT/SW)</td><td><b>D5 / D6 / D7</b></td><td>GPIO 14 / 12 / 13</td></tr>
+        <tr><td>I2C Шина (SDA / SCL)</td><td><b>D2 / D1</b></td><td>GPIO 4 / 5 (OLED + PCF)</td></tr>
+        <tr><td>Кулер Fan (P0) / Резерв (P1)</td><td>—</td><td>P0 / P1 на PCF8574</td></tr>
+        <tr><td>Кнопки BACK (P2) / CONF (P3)</td><td>—</td><td>P2 / P3 на PCF8574</td></tr>
+      </table>
+    </details>
 
-        <p><b>2. Kd (Тормоз / Прогноз):</b> Гасит мощность заранее при подлете к цели.<br>
-        • <i>Слишком мало:</i> Температура по инерции проскакивает уставку на 10-20 &deg;C.<br>
-        • <i>Слишком много:</i> Мощность дергается, столик не может доехать до уставки.</p>
-
-        <p><b>3. Ki (Точность):</b> Дожимает последние 1-3 градуса ровно до цели.<br>
-        • Начинайте с малых значений (0.01 - 0.05). Большие значения раскачивают систему волнами.</p>
-
-        <p style="background:#2a2a2a;padding:6px;border-left:3px solid #ff5722;color:#fff">
-        <b>Базовый рецепт для столика 400-500W:</b><br>
-        Поставьте <code>Ki = 0</code>, <code>Kd = 15</code>. Подбирайте <code>Kp</code> (обычно 3 - 6), пока столик не станет быстро греться. Затем увеличивайте <code>Kd</code> (до 20 - 35), чтобы убрать перелет. В конце добавьте <code>Ki = 0.05</code> для идеальной точки.
-        </p>
+    <details>
+      <summary>3. Силовая безопасность 220V</summary>
+      <div style="font-size:12px;color:#ccc;line-height:1.5;margin-top:6px">
+        ⚠️ <b>Аппаратный термопредохранитель (240-250&deg;C 10A):</b> Устанавливается в разрыв провода фазы 220V и прижимается к подошве стола. При пробое симистора он физически обесточит ТЭН и защитит от пожара.
       </div>
     </details>
   </div>
 
   <div class="card">
-    <h3>OTA Firmware Update (По воздуху)</h3>
-    <p style="font-size:13px;color:#aaa">Выберите файл <b>firmware.bin</b> из папки <code>.pio/build/nodemcuv2/</code>:</p>
+    <h3>OTA Firmware Update</h3>
+    <p style="font-size:13px;color:#aaa">Выберите файл <b>firmware.bin</b> из папки <code>.pio/build/esp32dev/</code> (или <code>nodemcuv2/</code>):</p>
     <input type='file' id='ota_file' style="background:#222;border:1px dashed #555;padding:10px;border-radius:6px">
     <button type='button' class='save' onclick='uploadOTA()' style="width:100%;margin-top:8px">Flash Firmware (.bin)</button>
     <div id='ota_progress_box' style="display:none;margin-top:12px">
@@ -273,7 +267,19 @@ try{pin=localStorage.getItem('pin')||'';$('pin').value=pin}catch(e){}
 function setPin(v){pin=v;try{localStorage.setItem('pin',v)}catch(e){}}
 function send(o){o.pin=pin;if(ws&&ws.readyState===1)ws.send(JSON.stringify(o))}
 function dt(d){send({a:'target',v:tgt+d,name:'Manual'})}
-function setPreset(t, name){ send({a:'target', v:t, name:name}); tab(0); }
+
+// Исправленный запуск профилей пайки по индексу (Sn63=0, LeadFree=1, Bi58=2)
+function runProf(idx){
+  send({a:'start_prof_idx', idx:idx});
+  tab(0);
+}
+
+// Запуск преднагревателя (разборка телефонов 80°C / нижний подогрев 110°C)
+function startPreheat(temp, min){
+  send({a:'cmd', text:`preheat ${temp} ${min}`});
+  tab(0);
+}
+
 function startTune(){
   if(confirm("Start automatic PID tuning around 150°C?\nThis takes ~3-5 minutes.")){
     send({a:'tune_start'});
@@ -288,10 +294,6 @@ function resetStats(all){
   } else {
     send({a:'reset_stats', all:false});
   }
-}
-function startProf(name, pre, soak, soak_t, ref, ref_t){
-  send({a:'start_prof', name:name, pre:pre, soak:soak, soak_t:soak_t*1000, ref:ref, ref_t:ref_t*1000});
-  tab(0);
 }
 
 function tab(idx){
@@ -341,7 +343,7 @@ function tele(d){
   $('fault').style.display=d.f?'block':'none';$('ft').textContent=d.ft;
   $('b_prof').textContent='Profile: '+(d.prof||'Manual');
   
-    fan_state = !!d.fan;
+  fan_state = !!d.fan;
   $('fb').textContent = fan_state ? '🌀 Fan: ON' : '🌀 Fan: OFF';
   $('fb').style.borderColor = fan_state ? '#00e676' : '#555';
 
@@ -440,7 +442,7 @@ function uploadOTA() {
   };
   xhr.onload = function() {
     if (xhr.status === 200) {
-      $('ota_status').innerHTML = '<b style="color:#00e676">Success! Rebooting ESP8266...</b>';
+      $('ota_status').innerHTML = '<b style="color:#00e676">Success! Rebooting Controller...</b>';
       let sec = 5;
       setInterval(() => {
         $('ota_status').textContent = `Reconnecting in ${sec} sec...`;
