@@ -42,6 +42,7 @@ public:
     is_active = true;
     current_phase = PHASE_PREHEAT;
     reflow_reached = false;
+    last_countdown_sec = -1;
     phase_start = millis();
     buzzer.play(SND_CLICK);
   }
@@ -54,6 +55,7 @@ public:
   void stop() {
     is_active = false;
     current_phase = PHASE_IDLE;
+    last_countdown_sec = -1;
   }
 
   void tick(uint32_t now, float current_temp, float &target_out, bool &heater_enable, bool &fan_request) {
