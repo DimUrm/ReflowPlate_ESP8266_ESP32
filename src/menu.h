@@ -142,6 +142,7 @@ void menuBack() {
 }
 
 // ---------------------------------------------------------------- рисование
+#if !defined(DISPLAY_ST7789)
 static void menuTitle(const char* t) {
   display.fillRect(0, 0, 128, 11, SSD1306_WHITE);
   display.setTextColor(SSD1306_BLACK);
@@ -287,6 +288,14 @@ void drawOtaProgress() {
   display.setCursor(16, 54); display.print("Do not power off!");
   display.display();
 }
+#else
+// Заглушки для цветного экрана (отрисовка UI для ST7789 находится в display_st7789.h)
+static void menuTitle(const char* t) {}
+static void menuRow(uint8_t row, const char* text, bool sel) {}
+void menuDraw() {}
+void drawSplash() {}
+void drawOtaProgress() {}
+#endif
 
 // Вызывается из loop(): таймаут меню, перерисовка по событию, сброс зависшей загрузки прошивки
 void menuTick(uint32_t now) {
