@@ -6,7 +6,8 @@
 // Для ESP32 можно выбрать либо монохромный OLED, либо цветной TFT ST7789:
 #if defined(ESP32)
   #define DISPLAY_ST7789       // Раскомментировано: Цветной IPS 1.14" 240x135
-  //#define DISPLAY_SSD1306    // Закомментировано: Монохромный OLED 128x64
+//#define DISPLAY_NOKIA5110  // Вариант 2: Nokia 5110 (84x48)  
+//#define DISPLAY_SSD1306    // Закомментировано: Монохромный OLED 128x64
 #else
   #define DISPLAY_SSD1306      // На ESP8266 всегда OLED
 #endif
