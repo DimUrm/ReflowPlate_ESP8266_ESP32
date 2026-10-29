@@ -142,7 +142,7 @@ void menuBack() {
 }
 
 // ---------------------------------------------------------------- рисование
-#if !defined(DISPLAY_ST7789)
+#if !defined(DISPLAY_ST7789) && !defined(DISPLAY_NOKIA5110)
 static void menuTitle(const char* t) {
   display.fillRect(0, 0, 128, 11, SSD1306_WHITE);
   display.setTextColor(SSD1306_BLACK);
