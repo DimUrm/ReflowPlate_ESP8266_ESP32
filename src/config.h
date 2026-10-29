@@ -40,16 +40,18 @@
   #define PIN_MAX_CS    4    // GPIO4  (MAX6675 CS)
   #define PIN_MAX_SCK   17   // GPIO17 (MAX6675 SCK)
 
-  #define PIN_I2C_SDA   21   // GPIO21 (I2C SDA для OLED)
-  #define PIN_I2C_SCL   22   // GPIO22 (I2C SCL для OLED)
-
   // Пины для цветного дисплея 1.14" ST7789 (4-Wire SPI)
   #define PIN_TFT_SCLK  14   // GPIO14 (SPI Clock)
   #define PIN_TFT_MOSI  13   // GPIO13 (SPI Data / MOSI)
   #define PIN_TFT_CS    5    // GPIO5  (Chip Select)
-  #define PIN_TFT_DC    21   // GPIO21 (Data / Command)
-  #define PIN_TFT_RST   22   // GPIO22 (Reset дисплея)
+  #define PIN_TFT_DC    21   // GPIO21 (Data / Command — эксклюзивно для TFT!)
+  #define PIN_TFT_RST   22   // GPIO22 (Reset дисплея — эксклюзивно для TFT!)
   #define PIN_TFT_BL    -1   // Подсветка подключена к 3.3V
+
+  #if !defined(DISPLAY_ST7789)
+    #define PIN_I2C_SDA 21   // Активно только если выбран OLED
+    #define PIN_I2C_SCL 22
+  #endif
 
   #define PIN_FAN       27   // GPIO27 (Мосфет вентилятора)
   #define PIN_BTN_BACK  32   // GPIO32 (Кнопка Back)
