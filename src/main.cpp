@@ -328,31 +328,20 @@ uint8_t readMax(float &t) {
   return SS_OK;
 }
 
-/*uint8_t readNtc(float &t) {
-  uint32_t sum = 0;
-  for (int i = 0; i < 8; i++) sum += analogRead(A0);
-  float avg = sum / 8.0f;
-  if (avg < 5.0f || avg > 1020.0f) return SS_OPEN;
-  float ratio = (avg / 1023.0f) * (ADC_FULL_V / NTC_VCC);
-  float r = NTC_R_FIXED * (1.0f - ratio) / ratio;
-  float inv = logf(r / NTC_R0) / NTC_BETA + 1.0f / (25.0f + 273.15f);
-  t = 1.0f / inv - 273.15f;
-  if (t < -30.0f || t > 400.0f) return SS_RANGE;
-  return SS_OK;
-}*/
-//================================================
 uint8_t readNtc(float &t) {
   uint32_t sum = 0;
   for (int i = 0; i < 8; i++) {
-    sum += analogRead(A0);
-    delay(2); // Небольшая пауза для стабильности АЦП на ESP8266
+    sum += analogRead(PIN_NTC_ADC);
+    delay(2);
   }
   float avg = sum / 8.0f;
 
-  // Проверка на обрыв (если напряжение слишком близко к 0 или к максимуму)
-  if (avg < 5.0f || avg > 1020.0f) {
-    return SS_OPEN; 
-  }
+  // Проверка на обрыв с учетом разрядности АЦП платформы:
+#if defined(ESP32)
+  if (avg < 15.0f || avg > 4080.0f) return SS_OPEN;
+#else
+  if (avg < 5.0f || avg > 1020.0f) return SS_OPEN;
+#endif
 
   // Расчет отношения напряжений: 12 бит для ESP32 (4095) и 10 бит для ESP8266 (1023)
 #if defined(ESP32)
@@ -641,30 +630,62 @@ void updateSSR(uint32_t now) {
 }
 
 #include "menu.h"   // меню энкодера, заставка и экран OTA (использует глобальные переменные и функции выше)
+#include "menu.h"   // меню энкодера, заставка и экран OTA (использует глобальные переменные и функции выше)
 void pollInputs(uint32_t now) {
   noInterrupts(); int d = enc_delta; enc_delta = 0; interrupts();
   if (d) { 
     resetActivityTimer();
-    if (profile.is_active) stopHeating();
-    setTarget(target_temp + d * 5); 
-    strlcpy(profile.name, "Manual", sizeof(profile.name));
-    buzzer.play(SND_CLICK);
+    if (menuActive()) {
+      menuTurn(d); // Навигация внутри открытого меню
+    } else {
+      if (profile.is_active) stopHeating();
+      setTarget(target_temp + d * 5); 
+      strlcpy(profile.name, "Manual", sizeof(profile.name));
+      buzzer.play(SND_CLICK);
+    }
     forceTele = true; 
   }
 
-  static bool last = HIGH, stable = HIGH; static uint32_t t0 = 0;
+  // Опрос кнопки энкодера с распознаванием короткого и длинного нажатия (>= 1 сек)
+  static bool last = HIGH, stable = HIGH; 
+  static uint32_t t0 = 0, press_start = 0;
+  static bool long_press_handled = false;
+
   bool r = digitalRead(PIN_ENC_SW);
   if (r != last) { last = r; t0 = now; }
   if (now - t0 > 40 && r != stable) {
     stable = r;
     if (stable == LOW) {
-      resetActivityTimer();
-      buzzer.play(SND_CLICK);
-      if (fault != F_NONE) fault = F_NONE;
-      else if (is_heating) stopHeating();
-      else startHeating();
-      forceTele = true;
+      press_start = now;
+      long_press_handled = false;
+    } else {
+      // Кнопку отпустили: если это не было длинное нажатие — выполняем короткий клик
+      if (!long_press_handled) {
+        resetActivityTimer();
+        if (menuActive()) {
+          menuPress();
+        } else {
+          buzzer.play(SND_CLICK);
+          if (fault != F_NONE) fault = F_NONE;
+          else if (is_heating) stopHeating();
+          else startHeating();
+        }
+        forceTele = true;
+      }
     }
+  }
+
+  // Проверка удержания кнопки энкодера (>= 1000 мс) для входа / выхода из меню
+  if (stable == LOW && !long_press_handled && (now - press_start >= 1000)) {
+    long_press_handled = true;
+    resetActivityTimer();
+    if (!menuActive()) {
+      if (menuCanOpen()) menuOpen();
+    } else {
+      menuBack();
+    }
+    forceTele = true;
+  }
   }
 
   // --- Кроссплатформенный опрос кнопок Back и Confirm ---
@@ -688,26 +709,32 @@ void pollInputs(uint32_t now) {
     }
 #endif
 
-    // Нажатие кнопки BACK (Стоп / Обдув / Сброс аварии)
+   // Нажатие кнопки BACK (Стоп / Обдув / Назад в меню)
     if (btn_back == LOW && last_btn_back == HIGH) {
       resetActivityTimer();
-      buzzer.play(SND_CLICK);
-      if (fault != F_NONE) {
-        fault = F_NONE;
-      } else if (is_heating) {
-        stopHeating();
-        fan_manual = true;
+      if (menuActive()) {
+        menuBack();
       } else {
-        fan_manual = !fan_manual;
+        buzzer.play(SND_CLICK);
+        if (fault != F_NONE) {
+          fault = F_NONE;
+        } else if (is_heating) {
+          stopHeating();
+          fan_manual = true;
+        } else {
+          fan_manual = !fan_manual;
+        }
       }
       forceTele = true;
     }
     last_btn_back = btn_back;
 
-    // Нажатие кнопки CONFIRM (Смена профилей по кругу)
+    // Нажатие кнопки CONFIRM (Выбор в меню / Смена профилей по кругу)
     if (btn_conf == LOW && last_btn_conf == HIGH) {
       resetActivityTimer();
-      if (is_heating || profile.is_active) {
+      if (menuActive()) {
+        menuPress();
+      } else if (is_heating || profile.is_active) {
         buzzer.play(SND_FAULT);
       } else {
         buzzer.play(SND_CLICK);
@@ -715,8 +742,8 @@ void pollInputs(uint32_t now) {
         preset_cycle = (preset_cycle + 1) % 4;
         setTarget(profile.list[preset_cycle].preheat);
         strlcpy(profile.name, profile.list[preset_cycle].name, sizeof(profile.name));
-        forceTele = true;
       }
+      forceTele = true;
     }
     last_btn_conf = btn_conf;
   }
