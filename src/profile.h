@@ -125,6 +125,7 @@ public:
 private:
   uint32_t phase_start = 0;
   bool reflow_reached = false;
+  int8_t last_countdown_sec = -1;
 };
 
 extern ProfileEngine profile;
