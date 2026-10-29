@@ -2,7 +2,7 @@
 #include <Arduino.h>
 #include "config.h"
 
-enum SoundAlert { SND_NONE, SND_CLICK, SND_REFLOW_START, SND_COMPLETE, SND_FAULT, SND_COOLED };
+enum SoundAlert { SND_NONE, SND_CLICK, SND_REFLOW_START, SND_COMPLETE, SND_FAULT, SND_COOLED, SND_COUNTDOWN };
 
 class BuzzerEngine {
 public:
@@ -68,7 +68,12 @@ public:
 
       case SND_COOLED:
         if (sound_step == 0) { playTone(1500); sound_step++; sound_step_time = now; }
-        else if (sound_step == 1 && dt > 200) { stopTone(); current_sound = SND_NONE; }
+        else if (dt > 200) { stopTone(); current_sound = SND_NONE; }
+        break;
+
+      case SND_COUNTDOWN:
+        if (sound_step == 0) { playTone(2800); sound_step++; sound_step_time = now; }
+        else if (dt > 40) { stopTone(); current_sound = SND_NONE; }
         break;
 
       case SND_FAULT:
