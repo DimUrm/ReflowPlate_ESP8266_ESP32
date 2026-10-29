@@ -683,11 +683,14 @@ void pollInputs(uint32_t now) {
           } else if (is_heating) {
             stopHeating();
           } else {
-            // Если выбран пресет подогревателя — запускаем с таймером автоотключения:
+            // Запуск выбранного пресета с кнопки:
             if (strcmp(profile.name, "Phone 80C") == 0) {
-              profile.startHold("Phone 80C", 80.0f, 15); // 80°C на 15 минут
+              profile.startHold("Phone 80C", 80.0f, 15);
             } else if (strcmp(profile.name, "PCB 110C") == 0) {
-              profile.startHold("PCB 110C", 110.0f, 20); // 110°C на 20 минут
+              profile.startHold("PCB 110C", 110.0f, 20);
+            } else if (strcmp(profile.name, "Manual") != 0) {
+              // Если выбран пресет пайки (Sn63, LeadFree и т.д.) — запускаем полноценный JEDEC-профиль!
+              profile.startByIndex(preset_cycle);
             }
             startHeating();
           }
