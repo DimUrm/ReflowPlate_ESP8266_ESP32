@@ -92,6 +92,11 @@ public:
           if (current_temp >= active_reflow - 4.0f) {
             reflow_reached = true;
             phase_start = now;
+          } else if (elapsed > 90000UL) { 
+            // Защитный таймаут: если за 90 сек не смогли добрать последние 4 градуса,
+            // считаем пик условно достигнутым, чтобы не сжечь плату!
+            reflow_reached = true;
+            phase_start = now;
           }
         } else {
           if (elapsed >= active_reflow_t) {
