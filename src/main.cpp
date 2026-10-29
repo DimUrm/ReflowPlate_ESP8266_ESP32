@@ -156,6 +156,8 @@ void resetActivityTimer() {
 #if defined(DISPLAY_ST7789) && defined(ESP32)
     tft.enableSleep(false);
     tft.enableDisplay(true);
+#elif defined(DISPLAY_NOKIA5110) && defined(ESP32)
+    // Nokia 5110 просыпается при первой же перерисовке кадра
 #else
     display.ssd1306_command(SSD1306_DISPLAYON);
 #endif
@@ -780,10 +782,10 @@ bool i2cPresent(uint8_t a) { Wire.beginTransmission(a); return Wire.endTransmiss
 
 bool initOled() {
 #if defined(DISPLAY_ST7789) && defined(ESP32)
-  // Если в config.h выбран цветной экран ST7789 на ESP32 — запускаем цветной IPS:
   return initTFT();
+#elif defined(DISPLAY_NOKIA5110) && defined(ESP32)
+  return initNokia();
 #else
-  // ВЕСЬ ВАШ ПРОВЕРЕННЫЙ КОД ДЛЯ GM009605/SSD1315 СОХРАНЁН НА 100%:
   Serial.println(F("[OLED] Starting GM009605 on ESP32..."));
 
   // 1. Даем 200 мс конденсатору автосброса на платке GM009605 полностью зарядиться!
@@ -981,9 +983,9 @@ void handleConsoleCommand(const String& cmd_raw) {
 #endif
   }
   else if (cmd == "oledtest") {
-#if defined(DISPLAY_ST7789) && defined(ESP32)
-    consoleLog("[OLED] Command unavailable: ST7789 Color TFT is active.");
-#else
+#if (defined(DISPLAY_ST7789) || defined(DISPLAY_NOKIA5110)) && defined(ESP32)
+    consoleLog("[OLED] Command unavailable: SPI Display is active.");
+#els
     consoleLog("[OLED] Running hardware fill test (White screen, Contrast 255)...");
     display.ssd1306_command(SSD1306_DISPLAYON);
     display.ssd1306_command(SSD1306_SETCONTRAST);
@@ -994,8 +996,8 @@ void handleConsoleCommand(const String& cmd_raw) {
 #endif
   }
   else if (cmd == "oledsh") {
-#if defined(DISPLAY_ST7789) && defined(ESP32)
-    consoleLog("[OLED] Command unavailable: ST7789 Color TFT is active.");
+#if (defined(DISPLAY_ST7789) || defined(DISPLAY_NOKIA5110)) && defined(ESP32)
+    consoleLog("[OLED] Command unavailable: SPI Display is active.");
 #else
     consoleLog("[OLED] Forcing SH1106 (1.3 inch) initialization sequence...");
     display.ssd1306_command(0xAE);
@@ -1591,6 +1593,9 @@ void loop() {
 #if defined(DISPLAY_ST7789) && defined(ESP32)
         tft.enableDisplay(false);
         tft.enableSleep(true);
+#elif defined(DISPLAY_NOKIA5110) && defined(ESP32)
+        display.clearDisplay();
+        display.display();
 #else
         display.ssd1306_command(SSD1306_DISPLAYOFF);
 #endif
