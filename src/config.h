@@ -51,7 +51,7 @@
   #define PIN_TFT_RST   22   // GPIO22 (Reset дисплея — эксклюзивно для TFT!)
   #define PIN_TFT_BL    -1   // Подсветка подключена к 3.3V
 
-  #if !defined(DISPLAY_ST7789)
+  #if !defined(DISPLAY_ST7789) && !defined(DISPLAY_NOKIA5110)
     #define PIN_I2C_SDA 21   // Активно только если выбран OLED
     #define PIN_I2C_SCL 22
   #endif
