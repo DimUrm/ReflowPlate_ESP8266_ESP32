@@ -101,10 +101,31 @@ inline void drawSplashST7789() {
   display.fillScreen(C_BLACK);
 }
 
+// Параметры и буфер мини-графика (90 секунд истории)
+static const int GRAPH_X = 144;
+static const int GRAPH_Y = 20;
+static const int GRAPH_W = 92;
+static const int GRAPH_H = 54;
+static uint8_t   t_hist[GRAPH_W] = {0};
+static uint32_t  last_hist_update = 0;
+
 inline void drawUI_ST7789(float current_t, float target_t, float power, bool heating, bool ssr, 
                           bool fan, const char* prof, const char* phase, uint8_t fault_c, 
                           bool mute, bool sleeping, bool valid) {
   if (!tft_initialized || sleeping) return;
+
+  uint32_t now = millis();
+
+  // Обновление кольцевого буфера графика 1 раз в секунду
+  if (now - last_hist_update >= 1000) {
+    last_hist_update = now;
+    for (int i = 0; i < GRAPH_W - 1; i++) {
+      t_hist[i] = t_hist[i + 1];
+    }
+    float c_temp = valid ? constrain(current_t, 25.0f, 260.0f) : 25.0f;
+    // Масштабируем температуру 25..260°C в высоту графика (0..GRAPH_H - 4)
+    t_hist[GRAPH_W - 1] = (uint8_t)map((long)c_temp, 25, 260, 0, GRAPH_H - 4);
+  }
 
   // 1. Верхний бар
   display.setTextSize(1);
@@ -126,44 +147,62 @@ inline void drawUI_ST7789(float current_t, float target_t, float power, bool hea
 
   display.drawFastHLine(0, 16, 240, C_GRAY);
 
-  // 2. Статус и профиль
+  // 2. Слева: Режим и статус
   display.setCursor(4, 20);
   if (fault_c != 0) {
     display.setTextColor(C_WHITE, C_RED);
-    display.printf(" ! FAULT: %-16s ", FAULT_NAMES[fault_c]);
+    display.printf("!%-10.10s", FAULT_NAMES[fault_c]);
   } else {
     display.setTextColor(heating ? C_RED : C_GREEN, C_BLACK);
     display.print(heating ? "HEAT " : "IDLE ");
-    
     display.setTextColor(C_WHITE, C_BLACK);
-    display.printf("[%-8s] ", prof);
-
-    if (strcmp(phase, "IDLE") != 0) {
-      display.setTextColor(C_YELLOW, C_BLACK);
-      display.printf("%-8s", phase);
-    } else {
-      display.print("        ");
-    }
+    display.printf("[%s]", prof);
   }
 
-  // 3. Главная цифра температуры
+  display.setCursor(4, 32);
+  display.setTextColor(C_YELLOW, C_BLACK);
+  if (strcmp(phase, "IDLE") != 0) {
+    display.printf("%-10.10s", phase);
+  } else {
+    display.print("READY     ");
+  }
+
+  // 3. Слева: Температура (крупный шрифт, аккуратно помещается левее графика)
   uint16_t t_color = valid ? getTemperatureColor(current_t) : C_GRAY;
-  display.setTextSize(4);
-  display.setCursor(15, 38);
+  display.setTextSize(3);
+  display.setCursor(4, 46);
   display.setTextColor(t_color, C_BLACK);
 
   if (valid) {
-    display.printf("%5.1f", current_t);
+    display.printf("%3.0f", current_t);
   } else {
-    display.print("NO SEN");
+    display.print("---");
   }
-  
-  display.setTextSize(2);
-  display.print(" o");
-  display.setTextSize(3);
-  display.print("C");
+  display.setTextSize(1); display.print("o"); 
+  display.setTextSize(2); display.print("C");
 
-  // 4. Графический бар мощности (0 - 100%)
+  // 4. Справа: МИНИ-ГРАФИК ТЕМПЕРАТУРЫ (90 сек)
+  display.drawRect(GRAPH_X, GRAPH_Y, GRAPH_W, GRAPH_H, C_GRAY);
+  display.fillRect(GRAPH_X + 1, GRAPH_Y + 1, GRAPH_W - 2, GRAPH_H - 2, C_BLACK);
+
+  // Опорные пунктирные уровни: 150°C (Preheat) и 217°C (Reflow)
+  int y_150 = (GRAPH_Y + GRAPH_H - 2) - map(150, 25, 260, 0, GRAPH_H - 4);
+  int y_217 = (GRAPH_Y + GRAPH_H - 2) - map(217, 25, 260, 0, GRAPH_H - 4);
+  for (int x = GRAPH_X + 2; x < GRAPH_X + GRAPH_W - 2; x += 4) {
+    display.drawPixel(x, y_150, C_DARK_BG);
+    display.drawPixel(x, y_217, C_DARK_BG);
+  }
+
+  // Отрисовка кривой температуры
+  for (int i = 0; i < GRAPH_W - 2; i++) {
+    if (t_hist[i] > 0 && t_hist[i + 1] > 0) {
+      int y1 = (GRAPH_Y + GRAPH_H - 2) - t_hist[i];
+      int y2 = (GRAPH_Y + GRAPH_H - 2) - t_hist[i + 1];
+      display.drawLine(GRAPH_X + 1 + i, y1, GRAPH_X + 2 + i, y2, C_ORANGE);
+    }
+  }
+
+  // 5. Графический бар мощности (0 - 100%)
   int bar_w = (int)((power / 100.0f) * 230.0f);
   display.drawRect(5, 78, 230, 8, C_GRAY);
   
@@ -173,7 +212,7 @@ inline void drawUI_ST7789(float current_t, float target_t, float power, bool hea
 
   display.drawFastHLine(0, 92, 240, C_GRAY);
 
-  // 5. Подвал
+  // 6. Подвал
   display.setTextSize(2);
   display.setCursor(6, 98);
   display.setTextColor(C_YELLOW, C_BLACK);
