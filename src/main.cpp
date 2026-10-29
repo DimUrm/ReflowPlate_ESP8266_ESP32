@@ -518,13 +518,20 @@ void applySensor() {
   Serial.printf("Sensor: %s\n", SENSOR_NAMES[sensor]);
 }
 
-// --- Кроссплатформенное управление вентилятором ---
-void setFanState(bool state) {
-  fan_active = state;
+// --- Кроссплатформенное управление вентилятором (ШИМ для ESP32, Реле для ESP8266) ---
+uint8_t fan_speed_val = 0;
+
+void setFanSpeed(uint8_t pct) {
+  pct = constrain(pct, 0, 100);
+  fan_speed_val = pct;
+  fan_active = (pct > 0);
 #if defined(ESP32)
-  digitalWrite(PIN_FAN, state ? HIGH : LOW);
+  // На ESP32: маппим 1..100% в скважность 8-битного ШИМ (70..255), чтобы мотор гарантированно стартовал
+  uint32_t duty = (pct == 0) ? 0 : map(pct, 1, 100, 75, 255);
+  ledcWrite(1, duty); // Канал LEDC 1
 #else
-  if (pcf_found) pcfWritePin(PCF_PIN_FAN, state);
+  // На ESP8266: релейное переключение через расширитель PCF8574
+  if (pcf_found) pcfWritePin(PCF_PIN_FAN, pct > 0);
 #endif
 }
 
@@ -577,17 +584,18 @@ void controlTick(uint32_t now) {
     return;
   }
 
-  bool auto_fan = false;
+  uint8_t auto_fan_speed = 0;
   ReflowPhase prev_phase = profile.current_phase;
-  profile.tick(now, temp_f, target_temp, is_heating, auto_fan);
+  profile.tick(now, temp_f, target_temp, is_heating, auto_fan_speed);
 
   if (prev_phase == PHASE_REFLOW && profile.current_phase == PHASE_COOLDOWN) {
     reflow_cycles_count++;
     cfg_save = true;
   }
 
-  // Управляем вентилятором через универсальную функцию
-  setFanState(fan_manual || auto_fan);
+  // При ручном включении дуем на 100%, при профиле — по кривой JEDEC
+  uint8_t target_fan_speed = fan_manual ? 100 : auto_fan_speed;
+  setFanSpeed(target_fan_speed);
 
 
   //Standby не поднимает уставку, если она уже ниже STANDBY_TEMP
@@ -1393,11 +1401,14 @@ void setup() {
 #endif
 
   #if defined(ESP32)
-  pinMode(PIN_FAN, OUTPUT);
-  digitalWrite(PIN_FAN, LOW);
+  // Настраиваем LEDC Канал 1 на частоту 5 кГц (бесшумный ШИМ для кулера)
+  ledcSetup(1, 5000, 8); // Канал 1, 5 кГц, 8 бит (0-255)
+  ledcAttachPin(PIN_FAN, 1);
+  ledcWrite(1, 0);       // Кулер выключен со старта
+
   pinMode(PIN_BTN_BACK, INPUT_PULLUP);
   pinMode(PIN_BTN_CONF, INPUT_PULLUP);
-  Serial.println(F("[HW] ESP32 Mode: Direct GPIOs for Fan & Buttons configured."));
+  Serial.println(F("[HW] ESP32 Mode: Hardware PWM Fan (5kHz) & Direct GPIOs configured."));
 #else
   pcf_found = initPCF8574();
   Serial.printf("PCF8574 Expander: %s (Addr: 0x%02X)\n", pcf_found ? "found" : "not found", pcf_address);
