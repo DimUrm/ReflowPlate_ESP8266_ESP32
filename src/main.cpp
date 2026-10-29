@@ -899,6 +899,9 @@ void handleConsoleCommand(const String& cmd_raw) {
     consoleLog("[CMD] Available: help, status, reboot, stop, fan on/off, mute on/off, target <temp>, scan, i2cscan, oledtest, oledsh");
   } 
   else if (cmd == "i2c" || cmd == "i2cscan") {
+#if defined(DISPLAY_ST7789) && defined(ESP32)
+    consoleLog("[I2C] Disabled! GPIO21 & GPIO22 are exclusively used by ST7789 (DC/RST).");
+#else
     consoleLog("[I2C] Scanning bus (SDA=GPIO" + String(PIN_I2C_SDA) + ", SCL=GPIO" + String(PIN_I2C_SCL) + ")...");
     uint8_t count = 0;
     for (uint8_t addr = 1; addr < 127; addr++) {
@@ -917,28 +920,36 @@ void handleConsoleCommand(const String& cmd_raw) {
       }
     }
     consoleLog("[I2C] Scan complete. Total devices: " + String(count));
+#endif
   }
   else if (cmd == "oledtest") {
+#if defined(DISPLAY_ST7789) && defined(ESP32)
+    consoleLog("[OLED] Command unavailable: ST7789 Color TFT is active.");
+#else
     consoleLog("[OLED] Running hardware fill test (White screen, Contrast 255)...");
     display.ssd1306_command(SSD1306_DISPLAYON);
     display.ssd1306_command(SSD1306_SETCONTRAST);
-    display.ssd1306_command(0xFF); // Максимальная яркость
-    display.fillScreen(SSD1306_WHITE); // Заливаем все пиксели
+    display.ssd1306_command(0xFF);
+    display.fillScreen(SSD1306_WHITE);
     display.display();
     consoleLog("[OLED] Sent. Did the screen light up white?");
+#endif
   }
   else if (cmd == "oledsh") {
+#if defined(DISPLAY_ST7789) && defined(ESP32)
+    consoleLog("[OLED] Command unavailable: ST7789 Color TFT is active.");
+#else
     consoleLog("[OLED] Forcing SH1106 (1.3 inch) initialization sequence...");
-    // Специфические команды помпы и адресации для SH1106
-    display.ssd1306_command(0xAE); // Display OFF
-    display.ssd1306_command(0xAD); // Charge pump command SH1106
-    display.ssd1306_command(0x8B); // Charge pump ON
-    display.ssd1306_command(0x81); // Contrast
-    display.ssd1306_command(0xFF); // Max
-    display.ssd1306_command(0xAF); // Display ON
+    display.ssd1306_command(0xAE);
+    display.ssd1306_command(0xAD);
+    display.ssd1306_command(0x8B);
+    display.ssd1306_command(0x81);
+    display.ssd1306_command(0xFF);
+    display.ssd1306_command(0xAF);
     display.fillScreen(SSD1306_WHITE);
     display.display();
     consoleLog("[OLED] SH1106 sequence sent.");
+#endif
   }
   else if (cmd == "status") {
     char buf[128];
