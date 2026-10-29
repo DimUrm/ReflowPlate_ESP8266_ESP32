@@ -79,10 +79,21 @@ public:
       case PHASE_SOAK:
         target_out = active_soak;
         heater_enable = true;
+
+        // Звуковой отсчет за 5 секунд до начала плавления:
+        if (active_soak_t > 5000 && elapsed >= (active_soak_t - 5000)) {
+          int8_t sec_left = (int8_t)((active_soak_t - elapsed) / 1000UL) + 1;
+          if (sec_left != last_countdown_sec && sec_left > 0 && sec_left <= 5) {
+            last_countdown_sec = sec_left;
+            buzzer.play(SND_COUNTDOWN);
+          }
+        }
+
         if (elapsed >= active_soak_t) {
           current_phase = PHASE_REFLOW;
           phase_start = now;
           reflow_reached = false;
+          last_countdown_sec = -1;
           buzzer.play(SND_REFLOW_START);
         }
         break;
