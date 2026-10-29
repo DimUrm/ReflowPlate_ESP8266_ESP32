@@ -630,7 +630,6 @@ void updateSSR(uint32_t now) {
 }
 
 #include "menu.h"   // меню энкодера, заставка и экран OTA (использует глобальные переменные и функции выше)
-#include "menu.h"   // меню энкодера, заставка и экран OTA (использует глобальные переменные и функции выше)
 void pollInputs(uint32_t now) {
   noInterrupts(); int d = enc_delta; enc_delta = 0; interrupts();
   if (d) { 
@@ -685,7 +684,6 @@ void pollInputs(uint32_t now) {
       menuBack();
     }
     forceTele = true;
-  }
   }
 
   // --- Кроссплатформенный опрос кнопок Back и Confirm ---
