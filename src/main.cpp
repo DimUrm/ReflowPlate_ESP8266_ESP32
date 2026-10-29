@@ -29,6 +29,8 @@
 
 #if defined(DISPLAY_ST7789) && defined(ESP32)
   #include "display_st7789.h"
+#elif defined(DISPLAY_NOKIA5110) && defined(ESP32)
+  #include "display_nokia5110.h"
 #else
   Adafruit_SSD1306 display(128, 64, &Wire, -1);
 #endif
