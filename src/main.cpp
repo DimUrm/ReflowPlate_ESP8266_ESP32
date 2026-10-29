@@ -415,6 +415,8 @@ void pidReset() { PID_I = 0; PID_P = 0; PID_D = 0; rate_f = 0; temp_prev = temp_
 void stopHeating() { 
   is_heating = false; 
   output_power = 0; 
+  digitalWrite(PIN_SSR, LOW); // Физически гарантированно гасим реле!
+  ssr_on = false;
   profile.stop();
   if (tune_state != TUNE_DONE) tune_state = TUNE_OFF;
   pidReset(); 
