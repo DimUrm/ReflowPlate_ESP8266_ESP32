@@ -2,8 +2,8 @@
 #include <Arduino.h>
 #include "buzzer.h"
 
-enum ReflowPhase { PHASE_IDLE, PHASE_PREHEAT, PHASE_SOAK, PHASE_REFLOW, PHASE_COOLDOWN };
-const char* const PHASE_NAMES[] = {"IDLE", "PREHEAT", "SOAK", "REFLOW", "COOLDOWN"};
+enum ReflowPhase { PHASE_IDLE, PHASE_PREHEAT, PHASE_SOAK, PHASE_REFLOW, PHASE_COOLDOWN, PHASE_HOLD };
+const char* const PHASE_NAMES[] = {"IDLE", "PREHEAT", "SOAK", "REFLOW", "COOLDOWN", "HOLD"};
 
 // Структура одного профиля пайки
 struct ReflowProfileItem {
@@ -42,6 +42,19 @@ public:
     is_active = true;
     current_phase = PHASE_PREHEAT;
     reflow_reached = false;
+    last_countdown_sec = -1;
+    phase_start = millis();
+    buzzer.play(SND_CLICK);
+  }
+
+// Запуск режима подогревателя с фиксацией температуры и таймером обратного отсчета:
+  void startHold(const char* hold_name, float target_t, uint32_t duration_min) {
+    strlcpy(name, hold_name, sizeof(name));
+    active_preheat = target_t;
+    hold_duration_ms = duration_min * 60UL * 1000UL;
+    is_active = true;
+    current_phase = PHASE_HOLD;
+    hold_reached = false;
     last_countdown_sec = -1;
     phase_start = millis();
     buzzer.play(SND_CLICK);
@@ -141,6 +154,26 @@ public:
           buzzer.play(SND_COOLED);
         }
         break;
+      
+      case PHASE_HOLD:
+        target_out = active_preheat;
+        heater_enable = true;
+        if (!hold_reached) {
+          if (current_temp >= active_preheat - 1.5f) {
+            hold_reached = true;
+            phase_start = now; // Старт таймера выдержки в момент выхода на температуру!
+            buzzer.play(SND_REFLOW_START);
+          }
+        } else {
+          if (elapsed >= hold_duration_ms) {
+            // Время выдержки подогревателя истекло — отключаем ТЭН и охлаждаем
+            current_phase = PHASE_COOLDOWN;
+            phase_start = now;
+            heater_enable = false;
+            buzzer.play(SND_COMPLETE);
+          }
+        }
+        break;
     }
   }
 
@@ -148,6 +181,8 @@ private:
   uint32_t phase_start = 0;
   bool reflow_reached = false;
   int8_t last_countdown_sec = -1;
+  uint32_t hold_duration_ms = 0;
+  bool hold_reached = false;
 };
 
 extern ProfileEngine profile;
