@@ -929,7 +929,32 @@ void handleConsoleCommand(const String& cmd_raw) {
   cmd.toLowerCase();
 
   if (cmd == "help") {
-    consoleLog("[CMD] Available: help, status, reboot, stop, fan on/off, mute on/off, target <temp>, scan, i2cscan, oledtest, oledsh");
+    consoleLog("[CMD] Available: help, status, reboot, stop, fan on/off, mute on/off, preheat <temp> <min>, target <temp>, scan, i2cscan, oledtest, oledsh");
+  } 
+  else if (cmd.startsWith("preheat")) {
+    // Формат: "preheat 80 15" или просто "preheat 80"
+    int first_space = cmd.indexOf(' ');
+    int second_space = cmd.indexOf(' ', first_space + 1);
+    float t = 80.0f;
+    uint32_t m = 15;
+    if (first_space > 0) {
+      if (second_space > 0) {
+        t = cmd.substring(first_space + 1, second_space).toFloat();
+        m = cmd.substring(second_space + 1).toInt();
+      } else {
+        t = cmd.substring(first_space + 1).toFloat();
+      }
+    }
+    if (t >= 40.0f && t <= 150.0f && m >= 1 && m <= 120) {
+      char p_name[24];
+      snprintf(p_name, sizeof(p_name), "Hold %.0fC", t);
+      profile.startHold(p_name, t, m);
+      startHeating();
+      consoleLog("[CMD] Preheater started: " + String((int)t) + " C for " + String((int)m) + " min.");
+    } else {
+      consoleLog("[ERR] Usage: preheat <temp 40-150> <minutes 1-120>");
+    }
+    forceTele = true;
   } 
   else if (cmd == "i2c" || cmd == "i2cscan") {
 #if (defined(DISPLAY_ST7789) || defined(DISPLAY_NOKIA5110)) && defined(ESP32)
