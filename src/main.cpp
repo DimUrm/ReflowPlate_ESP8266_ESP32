@@ -676,9 +676,19 @@ void pollInputs(uint32_t now) {
           menuPress();
         } else {
           buzzer.play(SND_CLICK);
-          if (fault != F_NONE) fault = F_NONE;
-          else if (is_heating) stopHeating();
-          else startHeating();
+          if (fault != F_NONE) {
+            fault = F_NONE;
+          } else if (is_heating) {
+            stopHeating();
+          } else {
+            // Если выбран пресет подогревателя — запускаем с таймером автоотключения:
+            if (strcmp(profile.name, "Phone 80C") == 0) {
+              profile.startHold("Phone 80C", 80.0f, 15); // 80°C на 15 минут
+            } else if (strcmp(profile.name, "PCB 110C") == 0) {
+              profile.startHold("PCB 110C", 110.0f, 20); // 110°C на 20 минут
+            }
+            startHeating();
+          }
         }
         forceTele = true;
       }
@@ -738,7 +748,7 @@ void pollInputs(uint32_t now) {
     }
     last_btn_back = btn_back;
 
-    // Нажатие кнопки CONFIRM (Выбор в меню / Смена профилей по кругу)
+    // Нажатие кнопки CONFIRM (Выбор в меню / Смена профилей и подогревателей по кругу)
     if (btn_conf == LOW && last_btn_conf == HIGH) {
       resetActivityTimer();
       if (menuActive()) {
@@ -748,9 +758,17 @@ void pollInputs(uint32_t now) {
       } else {
         buzzer.play(SND_CLICK);
         static uint8_t preset_cycle = 0;
-        preset_cycle = (preset_cycle + 1) % 4;
-        setTarget(profile.list[preset_cycle].preheat);
-        strlcpy(profile.name, profile.list[preset_cycle].name, sizeof(profile.name));
+        preset_cycle = (preset_cycle + 1) % 6; // 4 профиля пайки + 2 режима подогрева
+        if (preset_cycle < 4) {
+          setTarget(profile.list[preset_cycle].preheat);
+          strlcpy(profile.name, profile.list[preset_cycle].name, sizeof(profile.name));
+        } else if (preset_cycle == 4) {
+          setTarget(80.0f);
+          strlcpy(profile.name, "Phone 80C", sizeof(profile.name));
+        } else {
+          setTarget(110.0f);
+          strlcpy(profile.name, "PCB 110C", sizeof(profile.name));
+        }
       }
       forceTele = true;
     }
