@@ -87,7 +87,7 @@ public:
             else playTone(1200); // Запуск следующего гудка
           }
         }
-        break;;
+        break;
 
       default:
         stopTone();
