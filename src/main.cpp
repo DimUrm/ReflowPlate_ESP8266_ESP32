@@ -1321,11 +1321,14 @@ void setupWifi() {
 }
 
 void setup() {
-#if defined(ESP32)
-  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); // Отключаем ложную панику детектора питания при бросках Wi-Fi
-#endif
+  // Пин SSR переводим в LOW немедленно первой строкой до любых инициализаций!
   pinMode(PIN_SSR, OUTPUT);
   digitalWrite(PIN_SSR, LOW);
+
+#if defined(ESP32)
+  // Вместо отключения защиты питания снижаем пиковую мощность передатчика Wi-Fi,
+  // чтобы не вызывать просадку шины 3.3V (см. setupWifi)
+#endif
 
   buzzer.init();
 
