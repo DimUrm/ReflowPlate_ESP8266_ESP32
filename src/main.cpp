@@ -802,7 +802,13 @@ void drawOled() {
   drawUI_ST7789(temp_f, target_temp, output_power, is_heating, ssr_on, 
                 fan_active, profile.name, PHASE_NAMES[profile.current_phase], 
                 fault, buzzer.mute, oled_sleeping, temp_valid);
-  return; // Выходим: цветной кадр 240x135 уже нарисован!
+  return;
+#elif defined(DISPLAY_NOKIA5110) && defined(ESP32)
+  if (ota_percent >= 0) { drawOtaNokia(ota_percent); return; }
+  drawUI_Nokia(temp_f, target_temp, output_power, is_heating, ssr_on, 
+               fan_active, profile.name, PHASE_NAMES[profile.current_phase], 
+               fault, buzzer.mute, oled_sleeping, temp_valid);
+  return; // Выходим: кадр Nokia 5110 уже нарисован!
 #else
   if (ota_percent >= 0) { drawOtaProgress(); return; }
   if (menuActive()) { menuDraw(); return; }
@@ -900,8 +906,8 @@ void handleConsoleCommand(const String& cmd_raw) {
     consoleLog("[CMD] Available: help, status, reboot, stop, fan on/off, mute on/off, target <temp>, scan, i2cscan, oledtest, oledsh");
   } 
   else if (cmd == "i2c" || cmd == "i2cscan") {
-#if defined(DISPLAY_ST7789) && defined(ESP32)
-    consoleLog("[I2C] Disabled! GPIO21 & GPIO22 are exclusively used by ST7789 (DC/RST).");
+#if (defined(DISPLAY_ST7789) || defined(DISPLAY_NOKIA5110)) && defined(ESP32)
+    consoleLog("[I2C] Disabled! GPIO21 & GPIO22 are exclusively used by SPI Display (DC/RST).");
 #else
     consoleLog("[I2C] Scanning bus (SDA=GPIO" + String(PIN_I2C_SDA) + ", SCL=GPIO" + String(PIN_I2C_SCL) + ")...");
     uint8_t count = 0;
@@ -1362,6 +1368,10 @@ void setup() {
   oled_ok = initTFT();
   Serial.printf("[TFT] ST7789 Color IPS (240x135): %s\n", oled_ok ? "INITIALIZED OK" : "NOT FOUND");
   if (oled_ok) drawSplashST7789();
+#elif defined(DISPLAY_NOKIA5110) && defined(ESP32)
+  oled_ok = initNokia();
+  Serial.printf("[LCD] Nokia 5110 PCD8544 (84x48): %s\n", oled_ok ? "INITIALIZED OK" : "NOT FOUND");
+  if (oled_ok) drawSplashNokia();
 #else
   Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
   Wire.setClock(100000);
