@@ -644,6 +644,9 @@ void updateSSR(uint32_t now) {
 
 #include "menu.h"   // меню энкодера, заставка и экран OTA (использует глобальные переменные и функции выше)
 void pollInputs(uint32_t now) {
+  static uint8_t preset_cycle = 0; // Доступна и кнопке Confirm, и кнопке энкодера
+
+  // --- 1. ВРАЩЕНИЕ ЭНКОДЕРА ---
   noInterrupts(); int d = enc_delta; enc_delta = 0; interrupts();
   if (d) { 
     resetActivityTimer();
@@ -658,65 +661,48 @@ void pollInputs(uint32_t now) {
     forceTele = true; 
   }
 
-  // Опрос кнопки энкодера с распознаванием короткого и длинного нажатия (>= 1 сек)
-  static bool last = HIGH, stable = HIGH; 
-  static uint32_t t0 = 0, press_start = 0;
-  static bool long_press_handled = false;
+  // --- 2. КНОПКА ЭНКОДЕРА: СРАБАТЫВАНИЕ СТРОГО НА НАЖАТИЕ ВНИЗ (DOWN-PRESS) ---
+  static bool last_sw = HIGH, stable_sw = HIGH; 
+  static uint32_t t_sw = 0;
 
-  bool r = digitalRead(PIN_ENC_SW);
-  if (r != last) { last = r; t0 = now; }
-  if (now - t0 > 40 && r != stable) {
-    stable = r;
-    if (stable == LOW) {
-      press_start = now;
-      long_press_handled = false;
-    } else {
-      // Кнопку отпустили: если это не было длинное нажатие — выполняем короткий клик
-      if (!long_press_handled) {
-        resetActivityTimer();
-        if (menuActive()) {
-          menuPress();
-        } else {
-          buzzer.play(SND_CLICK);
-          if (fault != F_NONE) {
-            fault = F_NONE;
-          } else if (is_heating) {
-            stopHeating();
-          } else {
-            // Запуск выбранного пресета с кнопки:
-            if (strcmp(profile.name, "Phone 80C") == 0) {
-              profile.startHold("Phone 80C", 80.0f, 15);
-            } else if (strcmp(profile.name, "PCB 110C") == 0) {
-              profile.startHold("PCB 110C", 110.0f, 20);
-            } else if (strcmp(profile.name, "Manual") != 0) {
-              // Если выбран пресет пайки (Sn63, LeadFree и т.д.) — запускаем полноценный JEDEC-профиль!
-              profile.startByIndex(preset_cycle);
-            }
-            startHeating();
-          }
+  bool r_sw = digitalRead(PIN_ENC_SW);
+  if (r_sw != last_sw) { last_sw = r_sw; t_sw = now; }
+  if (now - t_sw > 40 && r_sw != stable_sw) {
+    stable_sw = r_sw;
+    if (stable_sw == LOW) { // Срабатывание сразу в момент нажатия вниз!
+      resetActivityTimer();
+      buzzer.play(SND_CLICK);
+
+      if (fault != F_NONE) {
+        fault = F_NONE; // Мгновенный сброс аварии
+      } else if (is_heating) {
+        stopHeating();  // Мгновенный аварийный стоп ТЭНа
+      } else if (menuActive()) {
+        menuPress();    // Выбор пункта меню (OK)
+      } else {
+        // Запуск выбранного пресета или ручного нагрева
+        if (strcmp(profile.name, "Phone 80C") == 0) {
+          profile.startHold("Phone 80C", 80.0f, 15);
+        } else if (strcmp(profile.name, "PCB 110C") == 0) {
+          profile.startHold("PCB 110C", 110.0f, 20);
+        } else if (strcmp(profile.name, "Manual") != 0) {
+          profile.startByIndex(preset_cycle);
         }
-        forceTele = true;
+        startHeating();
       }
+      forceTele = true;
     }
   }
 
-  // Проверка удержания кнопки энкодера (>= 1000 мс) для входа / выхода из меню
-  if (stable == LOW && !long_press_handled && (now - press_start >= 1000)) {
-    long_press_handled = true;
-    resetActivityTimer();
-    if (!menuActive()) {
-      if (menuCanOpen()) menuOpen();
-    } else {
-      menuBack();
-    }
-    forceTele = true;
-  }
-
-  // --- Кроссплатформенный опрос кнопок Back и Confirm ---
+  // --- 3. КРОССПЛАТФОРМЕННЫЙ ОПРОС КНОПОК BACK И CONFIRM ---
   static uint32_t btn_poll_timer = 0;
   static bool last_btn_back = HIGH, last_btn_conf = HIGH;
 
-  if (now - btn_poll_timer > 60) {
+  // Переменные для отслеживания удержания кнопки CONFIRM
+  static uint32_t conf_down_time = 0;
+  static bool conf_long_fired = false;
+
+  if (now - btn_poll_timer > 40) {
     btn_poll_timer = now;
     
     bool btn_back = HIGH;
@@ -733,49 +719,74 @@ void pollInputs(uint32_t now) {
     }
 #endif
 
-   // Нажатие кнопки BACK (Стоп / Обдув / Назад в меню)
+    // ===== КНОПКА BACK: СРАБАТЫВАНИЕ СРАЗУ НА НАЖАТИЕ ВНИЗ =====
     if (btn_back == LOW && last_btn_back == HIGH) {
       resetActivityTimer();
-      if (menuActive()) {
-        menuBack();
+      buzzer.play(SND_CLICK);
+
+      if (fault != F_NONE) {
+        fault = F_NONE; // Мгновенный сброс аварии
+      } else if (is_heating) {
+        stopHeating();
+        fan_manual = true; // Аварийный стоп ТЭНа + принудительный обдув кулером
+      } else if (menuActive()) {
+        menuBack(); // В меню: шаг назад
       } else {
-        buzzer.play(SND_CLICK);
-        if (fault != F_NONE) {
-          fault = F_NONE;
-        } else if (is_heating) {
-          stopHeating();
-          fan_manual = true;
-        } else {
-          fan_manual = !fan_manual;
-        }
+        fan_manual = !fan_manual; // В простое: включение/выключение обдува
       }
       forceTele = true;
     }
     last_btn_back = btn_back;
 
-    // Нажатие кнопки CONFIRM (Выбор в меню / Смена профилей и подогревателей по кругу)
+    // ===== КНОПКА CONFIRM =====
+    // 1) Фиксация момента нажатия вниз
     if (btn_conf == LOW && last_btn_conf == HIGH) {
+      conf_down_time = now;
+      conf_long_fired = false;
+    }
+
+    // 2) Удержание кнопки CONFIRM >= 1000 мс (Вход / Выход из меню)
+    if (btn_conf == LOW && !conf_long_fired && (now - conf_down_time >= 1000)) {
+      conf_long_fired = true;
       resetActivityTimer();
-      if (menuActive()) {
-        menuPress();
-      } else if (is_heating || profile.is_active) {
-        buzzer.play(SND_FAULT);
-      } else {
-        buzzer.play(SND_CLICK);
-        static uint8_t preset_cycle = 0;
-        preset_cycle = (preset_cycle + 1) % 6; // 4 профиля пайки + 2 режима подогрева
-        if (preset_cycle < 4) {
-          setTarget(profile.list[preset_cycle].preheat);
-          strlcpy(profile.name, profile.list[preset_cycle].name, sizeof(profile.name));
-        } else if (preset_cycle == 4) {
-          setTarget(80.0f);
-          strlcpy(profile.name, "Phone 80C", sizeof(profile.name));
+      if (!is_heating && fault == F_NONE) {
+        if (!menuActive()) {
+          if (menuCanOpen()) menuOpen(); // Вход в меню
         } else {
-          setTarget(110.0f);
-          strlcpy(profile.name, "PCB 110C", sizeof(profile.name));
+          menuClose(); // Выход из меню
         }
+      } else {
+        buzzer.play(SND_FAULT);
       }
       forceTele = true;
+    }
+
+    // 3) Отпускание кнопки CONFIRM (Короткий клик < 1000 мс)
+    if (btn_conf == HIGH && last_btn_conf == LOW) {
+      if (!conf_long_fired) {
+        resetActivityTimer();
+        if (menuActive()) {
+          menuPress(); // Внутри меню: OK / Выбрать
+          buzzer.play(SND_CLICK);
+        } else if (is_heating || profile.is_active) {
+          buzzer.play(SND_FAULT); // Во время нагрева: блокировка со звуком ошибки
+        } else {
+          buzzer.play(SND_CLICK);
+          // В простое: переключение 6 пресетов по кругу
+          preset_cycle = (preset_cycle + 1) % 6;
+          if (preset_cycle < 4) {
+            setTarget(profile.list[preset_cycle].preheat);
+            strlcpy(profile.name, profile.list[preset_cycle].name, sizeof(profile.name));
+          } else if (preset_cycle == 4) {
+            setTarget(80.0f);
+            strlcpy(profile.name, "Phone 80C", sizeof(profile.name));
+          } else {
+            setTarget(110.0f);
+            strlcpy(profile.name, "PCB 110C", sizeof(profile.name));
+          }
+        }
+        forceTele = true;
+      }
     }
     last_btn_conf = btn_conf;
   }
