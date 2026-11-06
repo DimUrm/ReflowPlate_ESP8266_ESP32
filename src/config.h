@@ -95,7 +95,7 @@ static const float      LIMIT_NTC     = 250.0f;
   static const float    ADC_FULL_V    = 3.2f; // Встроенный делитель NodeMCU (220k/100k) масштабирует вход до 3.2V
 #else
   static const float    ADC_FULL_V    = 3.3f; // ESP32 АЦП
-#endi
+#endif
 
 static const float    SIM_AMB       = 25.0f;
 static const float    SIM_PMAX      = 400.0f;
