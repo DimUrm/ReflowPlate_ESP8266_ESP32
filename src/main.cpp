@@ -841,19 +841,21 @@ void drawOled() {
 
 #if defined(DISPLAY_ST7789) && defined(ESP32)
   if (ota_percent >= 0) { drawOtaST7789(ota_percent); return; }
+  if (menuActive()) { menuDraw(); return; } // Меню на цветном ST7789
   drawUI_ST7789(temp_f, target_temp, output_power, is_heating, ssr_on, 
                 fan_active, profile.name, PHASE_NAMES[profile.current_phase], 
                 fault, buzzer.mute, oled_sleeping, temp_valid);
   return;
 #elif defined(DISPLAY_NOKIA5110) && defined(ESP32)
   if (ota_percent >= 0) { drawOtaNokia(ota_percent); return; }
+  if (menuActive()) { menuDraw(); return; } // Меню на Nokia 5110
   drawUI_Nokia(temp_f, target_temp, output_power, is_heating, ssr_on, 
                fan_active, profile.name, PHASE_NAMES[profile.current_phase], 
                fault, buzzer.mute, oled_sleeping, temp_valid);
-  return; // Выходим: кадр Nokia 5110 уже нарисован!
+  return;
 #else
   if (ota_percent >= 0) { drawOtaProgress(); return; }
-  if (menuActive()) { menuDraw(); return; }
+  if (menuActive()) { menuDraw(); return; } // Меню на OLED SSD1306
   display.clearDisplay();
 #endif
 
