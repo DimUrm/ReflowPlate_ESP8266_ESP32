@@ -109,7 +109,7 @@ th{background:#333;color:#ff5722}
     <h3>Sensor & PID Tuning</h3>
     <label>Sensor Hardware</label>
     <select id="sn">
-      <option value="auto">Auto (MAX6675, else simulation)</option>
+      <option value="auto">Auto (MAX6675 or NTC, else simulation)</option>
       <option value="max">MAX6675 thermocouple</option>
       <option value="ntc">NTC 100k (A0 on 8266 / GPIO36 on ESP32)</option>
       <option value="sim">Simulation (Virtual plate)</option>
@@ -227,7 +227,7 @@ th{background:#333;color:#ff5722}
       <table>
         <tr><th>Периферия</th><th>Пин ESP32</th><th>GPIO</th><th>Примечание</th></tr>
         <tr><td>SSR Реле (220V)</td><td><b>GPIO 25</b></td><td>GPIO25</td><td>Медленный ШИМ (окно 1 сек). Стяжка 10к к GND!</td></tr>
-        <tr><td>Кулер (Fan)</td><td><b>GPIO 27</b></td><td>GPIO27</td><td>Аппаратный ШИМ 5 кГц (JEDEC охлаждение)</td></tr>
+        <tr><td>Кулер (Fan)</td><td><b>GPIO 27</b></td><td>GPIO27</td><td>Аппаратный ШИМ 25 кГц (JEDEC охлаждение)</td></tr>
         <tr><td>Кнопка <b>BACK</b></td><td><b>GPIO 32</b></td><td>GPIO32</td><td>Вход: Стоп / Обдув / Назад (на GND)</td></tr>
         <tr><td>Кнопка <b>CONFIRM</b></td><td><b>GPIO 33</b></td><td>GPIO33</td><td>Вход: Пресеты пайки + Подогрев (на GND)</td></tr>
         <tr><td>Зуммер (Buzzer)</td><td><b>GPIO 26</b></td><td>GPIO26</td><td>ШИМ LEDC канал 0 (отсчет 5 сек перед пиком)</td></tr>
