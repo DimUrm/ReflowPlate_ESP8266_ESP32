@@ -31,7 +31,7 @@
   #include "display_st7789.h"
 #elif defined(DISPLAY_NOKIA5110) && defined(ESP32)
   #include "display_nokia5110.h"
-#else
+#elif defined(DISPLAY_SSD1306)
   Adafruit_SSD1306 display(128, 64, &Wire, -1);
 #endif
 
@@ -158,7 +158,7 @@ void resetActivityTimer() {
     tft.enableDisplay(true);
 #elif defined(DISPLAY_NOKIA5110) && defined(ESP32)
     // Nokia 5110 просыпается при первой же перерисовке кадра
-#else
+#elif defined(DISPLAY_SSD1306)
     display.ssd1306_command(SSD1306_DISPLAYON);
 #endif
     oled_sleeping = false;
@@ -799,31 +799,36 @@ bool initOled() {
   return initTFT();
 #elif defined(DISPLAY_NOKIA5110) && defined(ESP32)
   return initNokia();
-#else
-  Serial.println(F("[OLED] Starting GM009605 on ESP32..."));
+#elif defined(DISPLAY_SSD1306)
+  // Проверяем физическое присутствие дисплея на шине I2C (0x3C или 0x3D)
+  uint8_t addr = 0;
+  if (i2cPresent(0x3C)) addr = 0x3C;
+  else if (i2cPresent(0x3D)) addr = 0x3D;
 
-  // 1. Даем 200 мс конденсатору автосброса на платке GM009605 полностью зарядиться!
-  delay(200);
-
-  // 2. Инициализация дисплея
-  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-    Serial.println(F("[OLED] Allocation or I2C fail!"));
+  if (addr == 0) {
+    Serial.println(F("[OLED] Display NOT detected at 0x3C or 0x3D!"));
     return false;
   }
 
-  // 3. Принудительный перезапуск помпы накачки питания матрицы (специфика SSD1315/GM009605)
-  Wire.beginTransmission(0x3C);
-  Wire.write(0x00); // Режим команд
-  Wire.write(0x8D); // Команда Charge Pump
-  Wire.write(0x14); // 0x14 = включить генератор 7.5V
-  Wire.write(0xAF); // 0xAF = включить экран (Display ON)
-  Wire.write(0x81); // Контраст
-  Wire.write(0xFF); // Максимальная яркость
+  delay(100);
+
+  if (!display.begin(SSD1306_SWITCHCAPVCC, addr)) {
+    Serial.printf("[OLED] Allocation or I2C fail at 0x%02X!\n", addr);
+    return false;
+  }
+
+  // Перезапуск помпы накачки питания матрицы (специфика SSD1306 / SSD1315)
+  Wire.beginTransmission(addr);
+  Wire.write(0x00);
+  Wire.write(0x8D);
+  Wire.write(0x14);
+  Wire.write(0xAF);
+  Wire.write(0x81);
+  Wire.write(0xFF);
   Wire.endTransmission();
 
   delay(20);
 
-  // 4. Тестовый вывод текста
   display.clearDisplay();
   display.setTextColor(SSD1306_WHITE);
   display.setTextSize(2);
@@ -831,8 +836,11 @@ bool initOled() {
   display.print("REFLOW OK");
   display.display();
 
-  Serial.println(F("[OLED] GM009605 Initialized and ignited!"));
+  Serial.printf("[OLED] SSD1306 successfully initialized at 0x%02X\n", addr);
   return true;
+#else
+  // Режим Headless (без дисплея)
+  return false;
 #endif
 }
 
@@ -1441,24 +1449,20 @@ void setup() {
   oled_ok = initNokia();
   Serial.printf("[LCD] Nokia 5110 PCD8544 (84x48): %s\n", oled_ok ? "INITIALIZED OK" : "NOT FOUND");
   if (oled_ok) drawSplashNokia();
-#else
+#elif defined(DISPLAY_SSD1306)
   Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
   Wire.setClock(100000);
-
-  // --- Диагностический I2C Сканер ---
-  Serial.printf("[I2C] Scanning bus (SDA=GPIO%d, SCL=GPIO%d)...\n", PIN_I2C_SDA, PIN_I2C_SCL);
-  uint8_t found_devices = 0;
-  for (uint8_t addr = 1; addr < 127; addr++) {
-    Wire.beginTransmission(addr);
-    if (Wire.endTransmission() == 0) {
-      Serial.printf("[I2C] Device FOUND at address: 0x%02X\n", addr);
-      found_devices++;
-    }
-  }
 
   oled_ok = initOled();
   Serial.printf("[OLED] Display status: %s\n", oled_ok ? "INITIALIZED OK" : "NOT FOUND");
   if (oled_ok) drawSplash();
+#else
+  // Режим Headless
+  #if defined(ESP8266)
+    Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL); // Шина нужна для расширителя PCF8574
+  #endif
+  oled_ok = false;
+  Serial.println(F("[SYS] Running in HEADLESS mode (No display compiled)."));
 #endif
 
   #if defined(ESP32)
@@ -1607,7 +1611,7 @@ void loop() {
 #elif defined(DISPLAY_NOKIA5110) && defined(ESP32)
         display.clearDisplay();
         display.display();
-#else
+#elif defined(DISPLAY_SSD1306)
         display.ssd1306_command(SSD1306_DISPLAYOFF);
 #endif
         oled_sleeping = true;
