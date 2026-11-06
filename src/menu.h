@@ -141,8 +141,237 @@ void menuBack() {
   }
 }
 
-// ---------------------------------------------------------------- рисование
-#if !defined(DISPLAY_ST7789) && !defined(DISPLAY_NOKIA5110)
+// ---------------------------------------------------------------- РИСОВАНИЕ МЕНЮ
+
+#if defined(DISPLAY_ST7789) && defined(ESP32)
+// ==================== МЕНЮ ДЛЯ ЦВЕТНОГО ЭКРАНА ST7789 (240x135) ====================
+static void menuTitleTFT(const char* t) {
+  display.fillRect(0, 0, 240, 20, C_ORANGE);
+  display.setTextColor(C_BLACK, C_ORANGE);
+  display.setTextSize(2);
+  display.setCursor(6, 3);
+  display.print(t);
+}
+
+static void menuRowTFT(uint8_t row, const char* text, bool sel) {
+  int y = 24 + row * 22;
+  if (sel) {
+    display.fillRect(2, y - 2, 236, 20, C_WHITE);
+    display.setTextColor(C_BLACK, C_WHITE);
+  } else {
+    display.fillRect(2, y - 2, 236, 20, C_DARK_BG);
+    display.setTextColor(C_GRAY, C_DARK_BG);
+  }
+  display.setTextSize(2);
+  display.setCursor(8, y);
+  display.print(text);
+}
+
+void menuDraw() {
+  display.fillScreen(C_BLACK);
+  char line[32];
+
+  switch (menu_screen) {
+    case MS_MAIN: {
+      static const char* const items[5] = {"Profiles >", "Settings >", "Auto-Tune", "Info >", "Exit"};
+      menuTitleTFT("MAIN MENU");
+      for (uint8_t i = 0; i < 5; i++) menuRowTFT(i, items[i], i == menu_sel);
+      break;
+    }
+    case MS_PROFILES: {
+      menuTitleTFT("SELECT PROFILE");
+      for (uint8_t i = 0; i < 4; i++) {
+        snprintf(line, sizeof(line), "%-9.9s %3d C", profile.list[i].name, (int)profile.list[i].reflow);
+        menuRowTFT(i, line, i == menu_sel);
+      }
+      menuRowTFT(4, "Back", menu_sel == 4);
+      break;
+    }
+    case MS_SETTINGS: {
+      menuTitleTFT("SETTINGS");
+      snprintf(line, sizeof(line), "Sound:  %s", buzzer.mute ? "MUTED" : "ON");
+      menuRowTFT(0, line, menu_sel == 0);
+      if (standby_timeout_min == 0) snprintf(line, sizeof(line), "Sleep:  OFF");
+      else snprintf(line, sizeof(line), "Sleep:  %u min", (unsigned)standby_timeout_min);
+      menuRowTFT(1, line, menu_sel == 1);
+      snprintf(line, sizeof(line), "Sensor: %s", MENU_SENSOR_LABEL[cfg_sensor % 4]);
+      menuRowTFT(2, line, menu_sel == 2);
+      snprintf(line, sizeof(line), "Fan:    %s", fan_manual ? "FORCED" : "AUTO");
+      menuRowTFT(3, line, menu_sel == 3);
+      menuRowTFT(4, "Back", menu_sel == 4);
+      break;
+    }
+    case MS_INFO: {
+      snprintf(line, sizeof(line), "INFO [%u/4]", (unsigned)menu_info_page + 1);
+      menuTitleTFT(line);
+      char r[4][32];
+      if (menu_info_page == 0) {
+        snprintf(r[0], 32, "FW:   %s", AUTO_FW_VERSION);
+        snprintf(r[1], 32, "Date: %s", AUTO_BUILD_DATE);
+        snprintf(r[2], 32, "Chip: 0x%06X", (unsigned)getBoardChipId());
+        snprintf(r[3], 32, "ROM:  %u KB", (unsigned)(ESP.getSketchSize() / 1024));
+      } else if (menu_info_page == 1) {
+        bool w_ok = (WiFi.status() == WL_CONNECTED);
+        String ip = w_ok ? WiFi.localIP().toString() : WiFi.softAPIP().toString();
+        snprintf(r[0], 32, "IP:   %s", ip.c_str());
+        String ssid = w_ok ? WiFi.SSID() : String("No Wi-Fi");
+        snprintf(r[1], 32, "SSID: %.12s", ssid.c_str());
+        snprintf(r[2], 32, "RSSI: %d dBm", w_ok ? (int)WiFi.RSSI() : 0);
+        snprintf(r[3], 32, "mDNS: %s.local", HOST);
+      } else if (menu_info_page == 2) {
+        uint32_t up = millis() / 1000UL;
+        snprintf(r[0], 32, "Up:   %02u:%02u:%02u", (unsigned)(up / 3600), (unsigned)((up / 60) % 60), (unsigned)(up % 60));
+        snprintf(r[1], 32, "Heap: %u B", (unsigned)ESP.getFreeHeap());
+        snprintf(r[2], 32, "MaxB: %u B", (unsigned)getLargestFreeBlock());
+        snprintf(r[3], 32, "Rst:  ESP32 OK");
+      } else {
+        snprintf(r[0], 32, "Heat: %.1f hrs", lifetime_heat_min / 60.0f);
+        snprintf(r[1], 32, "Runs: %u cyc", (unsigned)reflow_cycles_count);
+        snprintf(r[2], 32, "Watt: %.1f Wh", session_wh);
+        snprintf(r[3], 32, "Sens: %s", SENSOR_NAMES[sensor]);
+      }
+      for (uint8_t i = 0; i < 4; i++) menuRowTFT(i, r[i], false);
+      menuRowTFT(4, "turn:page hold:exit", false);
+      break;
+    }
+    case MS_CONFIRM: {
+      if (menu_confirm_kind == MC_PROFILE) {
+        const ReflowProfileItem& p = profile.list[menu_confirm_idx];
+        menuTitleTFT("START PROFILE?");
+        snprintf(line, sizeof(line), "Name: %s", p.name);     menuRowTFT(0, line, false);
+        snprintf(line, sizeof(line), "Pre:  %d C", (int)p.preheat); menuRowTFT(1, line, false);
+        snprintf(line, sizeof(line), "Soak: %d C (%ds)", (int)p.soak, (int)p.soak_t); menuRowTFT(2, line, false);
+        snprintf(line, sizeof(line), "Peak: %d C (%ds)", (int)p.reflow, (int)p.reflow_t); menuRowTFT(3, line, false);
+      } else {
+        menuTitleTFT("START AUTO-TUNE?");
+        menuRowTFT(0, "Target: 150 C", false);
+        menuRowTFT(1, "Oscillates power", false);
+        menuRowTFT(2, "Takes 3-5 min", false);
+        menuRowTFT(3, "Do not leave!", false);
+      }
+      menuRowTFT(4, "CLICK:YES  BACK:NO", true);
+      break;
+    }
+    default: break;
+  }
+}
+void drawSplash() {}
+void drawOtaProgress() {}
+
+#elif defined(DISPLAY_NOKIA5110) && defined(ESP32)
+// ==================== МЕНЮ ДЛЯ МОНОХРОМНОГО NOKIA 5110 (84x48) ====================
+static void menuTitleNokia(const char* t) {
+  display.fillRect(0, 0, 84, 8, BLACK);
+  display.setTextColor(WHITE, BLACK);
+  display.setTextSize(1);
+  display.setCursor(2, 0);
+  display.print(t);
+}
+
+static void menuRowNokia(uint8_t row, const char* text, bool sel) {
+  int y = 8 + row * 8; // Ровно 5 строк по 8px (y=8,16,24,32,40)
+  if (sel) {
+    display.fillRect(0, y, 84, 8, BLACK);
+    display.setTextColor(WHITE, BLACK);
+  } else {
+    display.setTextColor(BLACK, WHITE);
+  }
+  display.setTextSize(1);
+  display.setCursor(2, y);
+  display.print(text);
+}
+
+void menuDraw() {
+  display.clearDisplay();
+  char line[16];
+
+  switch (menu_screen) {
+    case MS_MAIN: {
+      static const char* const items[5] = {"1.Profiles >", "2.Settings >", "3.Auto-Tune", "4.Info >", "5.Exit"};
+      menuTitleNokia("MENU");
+      for (uint8_t i = 0; i < 5; i++) menuRowNokia(i, items[i], i == menu_sel);
+      break;
+    }
+    case MS_PROFILES: {
+      menuTitleNokia("PROFILES");
+      for (uint8_t i = 0; i < 4; i++) {
+        snprintf(line, sizeof(line), "%-6.6s %3dC", profile.list[i].name, (int)profile.list[i].reflow);
+        menuRowNokia(i, line, i == menu_sel);
+      }
+      menuRowNokia(4, "< Back", menu_sel == 4);
+      break;
+    }
+    case MS_SETTINGS: {
+      menuTitleNokia("SETTINGS");
+      snprintf(line, sizeof(line), "Snd:%s", buzzer.mute ? "OFF" : "ON");
+      menuRowNokia(0, line, menu_sel == 0);
+      if (standby_timeout_min == 0) snprintf(line, sizeof(line), "Stby:OFF");
+      else snprintf(line, sizeof(line), "Stby:%um", (unsigned)standby_timeout_min);
+      menuRowNokia(1, line, menu_sel == 1);
+      snprintf(line, sizeof(line), "Sn:%s", MENU_SENSOR_LABEL[cfg_sensor % 4]);
+      menuRowNokia(2, line, menu_sel == 2);
+      snprintf(line, sizeof(line), "Fan:%s", fan_manual ? "ON" : "AUTO");
+      menuRowNokia(3, line, menu_sel == 3);
+      menuRowNokia(4, "< Back", menu_sel == 4);
+      break;
+    }
+    case MS_INFO: {
+      snprintf(line, sizeof(line), "INFO %u/4", (unsigned)menu_info_page + 1);
+      menuTitleNokia(line);
+      char r[4][16];
+      if (menu_info_page == 0) {
+        snprintf(r[0], 16, "FW:%.9s", AUTO_FW_VERSION);
+        snprintf(r[1], 16, "ID:%06X", (unsigned)getBoardChipId());
+        snprintf(r[2], 16, "ROM:%uK", (unsigned)(ESP.getSketchSize() / 1024));
+        snprintf(r[3], 16, "Heap:%uK", (unsigned)(ESP.getFreeHeap() / 1024));
+      } else if (menu_info_page == 1) {
+        bool w_ok = (WiFi.status() == WL_CONNECTED);
+        String ip = w_ok ? WiFi.localIP().toString() : WiFi.softAPIP().toString();
+        snprintf(r[0], 16, "%.13s", ip.c_str());
+        snprintf(r[1], 16, "%s", w_ok ? "Wi-Fi: OK" : "AP Mode");
+        snprintf(r[2], 16, "Sig:%ddBm", w_ok ? (int)WiFi.RSSI() : 0);
+        snprintf(r[3], 16, "reflow.local");
+      } else if (menu_info_page == 2) {
+        uint32_t up = millis() / 1000UL;
+        snprintf(r[0], 16, "Up:%02u:%02u:%02u", (unsigned)(up / 3600), (unsigned)((up / 60) % 60), (unsigned)(up % 60));
+        snprintf(r[1], 16, "Heat:%.1fh", lifetime_heat_min / 60.0f);
+        snprintf(r[2], 16, "Runs:%u", (unsigned)reflow_cycles_count);
+        snprintf(r[3], 16, "Pwr:%.1fWh", session_wh);
+      } else {
+        snprintf(r[0], 16, "Sens:%s", SENSOR_NAMES[sensor]);
+        snprintf(r[1], 16, "Stat:%s", SS_NAMES[sensor_st]);
+        snprintf(r[2], 16, "Kp:%.1f", Kp);
+        snprintf(r[3], 16, "Kd:%.1f", Kd);
+      }
+      for (uint8_t i = 0; i < 4; i++) menuRowNokia(i, r[i], false);
+      menuRowNokia(4, "turn:pg hold:x", false);
+      break;
+    }
+    case MS_CONFIRM: {
+      menuTitleNokia(menu_confirm_kind == MC_PROFILE ? "START PROF?" : "AUTO-TUNE?");
+      if (menu_confirm_kind == MC_PROFILE) {
+        const ReflowProfileItem& p = profile.list[menu_confirm_idx];
+        snprintf(line, sizeof(line), "%.12s", p.name);          menuRowNokia(0, line, false);
+        snprintf(line, sizeof(line), "Pre:%dC", (int)p.preheat); menuRowNokia(1, line, false);
+        snprintf(line, sizeof(line), "Ref:%dC %ds", (int)p.reflow, (int)p.reflow_t); menuRowNokia(2, line, false);
+      } else {
+        menuRowNokia(0, "Tune at 150C", false);
+        menuRowNokia(1, "Takes ~4 min", false);
+        menuRowNokia(2, "Stay near!", false);
+      }
+      menuRowNokia(3, "OK:YES", true);
+      menuRowNokia(4, "BACK:Cancel", false);
+      break;
+    }
+    default: break;
+  }
+  display.display();
+}
+void drawSplash() {}
+void drawOtaProgress() {}
+
+#else
+// ==================== МЕНЮ ДЛЯ МОНОХРОМНОГО OLED SSD1306 (128x64) ====================
 static void menuTitle(const char* t) {
   display.fillRect(0, 0, 128, 11, SSD1306_WHITE);
   display.setTextColor(SSD1306_BLACK);
@@ -259,7 +488,6 @@ void menuDraw() {
   display.display();
 }
 
-// Заставка при включении: название, версия и дата сборки
 void drawSplash() {
   display.clearDisplay();
   display.setTextWrap(false);
@@ -271,10 +499,9 @@ void drawSplash() {
   display.setCursor(10, 44); display.print("FW "); display.print(AUTO_FW_VERSION);
   display.setCursor(10, 54); display.print(AUTO_BUILD_DATE);
   display.display();
-  delay(1500);                         // нагрев в это время выключен (SSR = LOW с первой строки setup)
+  delay(1500);
 }
 
-// Экран обновления прошивки по воздуху
 void drawOtaProgress() {
   int p = ota_percent < 0 ? 0 : (ota_percent > 100 ? 100 : ota_percent);
   display.clearDisplay();
@@ -288,13 +515,6 @@ void drawOtaProgress() {
   display.setCursor(16, 54); display.print("Do not power off!");
   display.display();
 }
-#else
-// Заглушки для цветного экрана (отрисовка UI для ST7789 находится в display_st7789.h)
-static void menuTitle(const char* t) {}
-static void menuRow(uint8_t row, const char* text, bool sel) {}
-void menuDraw() {}
-void drawSplash() {}
-void drawOtaProgress() {}
 #endif
 
 // Вызывается из loop(): таймаут меню, перерисовка по событию, сброс зависшей загрузки прошивки
