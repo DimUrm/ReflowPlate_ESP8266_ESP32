@@ -287,15 +287,6 @@ th{background:#333;color:#ff5722}
   </div>
 
   <div class="card">
-    <h3>Update from GitHub</h3>
-    <p style="font-size:12px;color:#aaa">Браузер скачивает прошивку с GitHub по HTTPS и отправляет на плату, плата проверяет MD5 из манифеста. Нужен интернет на этом устройстве.</p>
-    <input id="gh_url" type="text" style="width:100%" placeholder="manifest URL (version.json)">
-    <button type="button" class="save" onclick="ghCheck()" style="width:100%;margin-top:6px">Check for update</button>
-    <p id="gh_msg" style="font-size:13px;color:#ccc;margin:8px 0"></p>
-    <button type="button" id="gh_install" onclick="ghInstall()" style="display:none;width:100%">Install</button>
-  </div>
-
-  <div class="card">
     <h3>OTA Firmware Update (По воздуху)</h3>
     <p style="font-size:13px;color:#aaa">Выберите файл <b>firmware.bin</b> из папки <code>releases/</code>:</p>
     <input type='file' id='ota_file' style="background:#222;border:1px dashed #555;padding:10px;border-radius:6px">
@@ -592,17 +583,17 @@ function saveMqtt(){
 function uploadOTA() {
   const fileInput = $('ota_file');
   if (!fileInput.files.length) { alert('Please select firmware.bin first!'); return; }
-  flashFile(fileInput.files[0], '');
+  flashFile(fileInput.files[0]);
 }
 
-function flashFile(file, md5) {
+function flashFile(file) {
   $('ota_progress_box').style.display = 'block';
   $('ota_bar').style.width = '0%';
   $('ota_percent').textContent = '0%';
   $('ota_status').textContent = 'Uploading firmware...';
 
   const xhr = new XMLHttpRequest();
-  xhr.open('POST', '/update' + (md5 ? '?md5=' + md5 : ''), true);
+  xhr.open('POST', '/update', true);
   if (pin) xhr.setRequestHeader('X-PIN', pin);
   xhr.setRequestHeader('Content-Type', 'application/octet-stream');
 
@@ -634,67 +625,6 @@ function flashFile(file, md5) {
   };
 
   xhr.send(file);
-}
-
-const GH_DEFAULT = 'https://raw.githubusercontent.com/DimUrm/ReflowPlate_ESP8266_ESP32/main/ota/version.json';
-let fw_cur = '', gh_manifest = null;
-try { $('gh_url').value = localStorage.getItem('gh_url') || GH_DEFAULT; } catch(e) { $('gh_url').value = GH_DEFAULT; }
-
-function verParts(v){ return String(v || '').replace(/^v/i, '').split('.').map(x => parseInt(x, 10) || 0); }
-function verCmp(a, b){
-  const x = verParts(a), y = verParts(b);
-  for (let i = 0; i < Math.max(x.length, y.length); i++) {
-    const d = (x[i] || 0) - (y[i] || 0);
-    if (d) return d > 0 ? 1 : -1;
-  }
-  return 0;
-}
-
-async function ghCheck(){
-  const url = $('gh_url').value.trim() || GH_DEFAULT;
-  try { localStorage.setItem('gh_url', url); } catch(e) {}
-  $('gh_install').style.display = 'none';
-  $('gh_msg').textContent = 'Checking...';
-  try {
-    const r = await fetch(url + (url.includes('?') ? '&' : '?') + 't=' + Date.now(), {cache: 'no-store'});
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const m = await r.json();
-    if (!m.version || !/^https:\/\//.test(m.url || '') || !/^[0-9a-f]{32}$/i.test(m.md5 || '')) throw new Error('bad manifest');
-    gh_manifest = m;
-    const c = verCmp(m.version, fw_cur);
-    if (c > 0) {
-      $('gh_msg').textContent = 'New version ' + m.version + ' is available (installed: ' + fw_cur + ').' + (m.notes ? ' ' + m.notes : '');
-      $('gh_install').textContent = 'Install ' + m.version;
-    } else if (c === 0) {
-      $('gh_msg').textContent = 'You already have the latest version (' + fw_cur + '). You can reinstall it.';
-      $('gh_install').textContent = 'Reinstall ' + m.version;
-    } else {
-      $('gh_msg').textContent = 'Installed ' + fw_cur + ' is newer than GitHub (' + m.version + ').';
-      $('gh_install').textContent = 'Downgrade to ' + m.version;
-    }
-    $('gh_install').style.display = 'block';
-  } catch (e) {
-    $('gh_msg').textContent = 'Check failed: ' + e.message + '. Is this device online?';
-  }
-}
-
-async function ghInstall(){
-  if (!gh_manifest) return;
-  if (!confirm('Install ' + gh_manifest.version + '? The plate will stop heating and reboot.')) return;
-  $('gh_msg').textContent = 'Downloading firmware...';
-  try {
-    const r = await fetch(gh_manifest.url + (gh_manifest.url.includes('?') ? '&' : '?') + 't=' + Date.now(), {cache: 'no-store'});
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const buf = await r.arrayBuffer();
-    const b = new Uint8Array(buf);
-    if (b.length < 100000 || b[0] !== 0xE9) throw new Error('not a valid firmware binary');
-    if (gh_manifest.size && b.length !== gh_manifest.size) throw new Error('size mismatch');
-    $('gh_msg').textContent = 'Uploading to the plate...';
-    $('ota_progress_box').scrollIntoView({behavior: 'smooth'});
-    flashFile(new File([buf], 'firmware.bin'), gh_manifest.md5.toLowerCase());
-  } catch (e) {
-    $('gh_msg').textContent = 'Download failed: ' + e.message;
-  }
 }
 
 function toggleConsoleStream(en){ send({a: 'console_en', en: en}); }
