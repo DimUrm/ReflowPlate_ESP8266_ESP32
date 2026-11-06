@@ -512,7 +512,14 @@ void applySensor() {
     case CFG_MAX: sensor = SN_MAX; break;
     case CFG_NTC: sensor = SN_NTC; break;
     case CFG_SIM: sensor = SN_SIM; break;
-    default:      sensor = maxPresent() ? SN_MAX : SN_SIM;
+    default:
+      if (maxPresent()) {
+        sensor = SN_MAX;
+      } else {
+        float dummy = 0;
+        sensor = (readNtc(dummy) == SS_OK) ? SN_NTC : SN_SIM;
+      }
+      break;
   }
   filter_init = false; temp_valid = false;
   sim_T = sim_S = SIM_AMB;
@@ -530,7 +537,7 @@ void setFanSpeed(uint8_t pct) {
 #if defined(ESP32)
   // На ESP32: маппим 1..100% в скважность 8-битного ШИМ (70..255), чтобы мотор гарантированно стартовал
   uint32_t duty = (pct == 0) ? 0 : map(pct, 1, 100, 75, 255);
-  ledcWrite(1, duty); // Канал LEDC 1
+  ledcWrite(2, duty); // Канал LEDC 2
 #else
   // На ESP8266: релейное переключение через расширитель PCF8574
   if (pcf_found) pcfWritePin(PCF_PIN_FAN, pct > 0);
@@ -1473,9 +1480,9 @@ void setup() {
 
   #if defined(ESP32)
   // Стандарт Intel 25 кГц (ультразвуковой бесшумный ШИМ кулера)
-  ledcSetup(1, 25000, 8); // Канал 1, 25 кГц, 8 бит (0-255)
-  ledcAttachPin(PIN_FAN, 1);
-  ledcWrite(1, 0);        // Кулер выключен со старта
+  ledcSetup(2, 25000, 8); // Канал 2, 25 кГц, 8 бит (0-255)
+  ledcAttachPin(PIN_FAN, 2);
+  ledcWrite(2, 0);        // Кулер выключен со старта
 
   pinMode(PIN_BTN_BACK, INPUT_PULLUP);
   pinMode(PIN_BTN_CONF, INPUT_PULLUP);
@@ -1516,9 +1523,10 @@ void setup() {
     [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
       // Проверка PIN-кода через заголовок
       const AsyncWebHeader* h = request->getHeader("X-PIN");
-      if (web_pin[0] && (!h || h->value() != web_pin)) {
-        return;
-      }
+    if (web_pin[0] && (!h || h->value() != web_pin)) {
+      Update.setError(UPDATE_ERROR_MAGIC_BYTE); // Помечаем как фатальную ошибку!
+      return;
+    }
 
       if (!index) {
         stopHeating();
@@ -1588,7 +1596,6 @@ void loop() {
     #endif
   }
 
-  ws.cleanupClients();
   // ВО ВРЕМЯ ПРОШИВКИ (OTA) ЗАМОРАЖИВАЕМ ВСЕ ТОРМОЗЯЩИЕ ЗАДАЧИ!
   if (ota_percent >= 0) {
     delay(1);
