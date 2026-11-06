@@ -87,12 +87,15 @@ static const uint32_t MQTT_RETRY_MAX_MS = 120000UL;  // максимум пау�
 #endif
 static const float    I_ZONE        = 10.0f;
 
-//static const float    NTC_R_FIXED   = 100000.0f, NTC_R0 = 100000.0f, NTC_BETA = 3950.0f;
-//static const float    NTC_VCC       = 3.3f, ADC_FULL_V = 3.2f;
-//static const float    LIMIT_NTC     = 120.0f;
 static const float      NTC_R_FIXED   = 4700.0f,   NTC_R0 = 100000.0f, NTC_BETA = 3950.0f;
-static const float      NTC_VCC       = 3.3f, ADC_FULL_V = 3.3f;
+static const float      NTC_VCC       = 3.3f;
 static const float      LIMIT_NTC     = 250.0f;
+
+#if defined(ESP8266)
+  static const float    ADC_FULL_V    = 3.2f; // Встроенный делитель NodeMCU (220k/100k) масштабирует вход до 3.2V
+#else
+  static const float    ADC_FULL_V    = 3.3f; // ESP32 АЦП
+#endi
 
 static const float    SIM_AMB       = 25.0f;
 static const float    SIM_PMAX      = 400.0f;
