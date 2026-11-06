@@ -20,6 +20,7 @@ class ProfileEngine {
 public:
   ReflowPhase current_phase = PHASE_IDLE;
   bool is_active = false;
+  bool timed_out = false; // Флаг ошибки недобора температуры
   char name[24] = "Manual";
 
   // Массив из 4 профилей в оперативной памяти
@@ -119,10 +120,11 @@ public:
             reflow_reached = true;
             phase_start = now;
           } else if (elapsed > 90000UL) { 
-            // Защитный таймаут: если за 90 сек не смогли добрать последние 4 градуса,
-            // считаем пик условно достигнутым, чтобы не сжечь плату!
-            reflow_reached = true;
-            phase_start = now;
+            // Недобор температуры за 90 сек: аварийный останов пайки
+            timed_out = true;
+            current_phase = PHASE_COOLDOWN;
+            is_active = false;
+            heater_enable = false;
           }
         } else {
           if (elapsed >= active_reflow_t) {
