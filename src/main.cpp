@@ -590,7 +590,13 @@ void controlTick(uint32_t now) {
   ReflowPhase prev_phase = profile.current_phase;
   profile.tick(now, temp_f, target_temp, is_heating, auto_fan_speed);
 
-  if (prev_phase == PHASE_REFLOW && profile.current_phase == PHASE_COOLDOWN) {
+  // Если за 90 сек не вышли на пик — выбиваем аппаратную аварию таймаута
+  if (profile.timed_out) {
+    profile.timed_out = false;
+    tripFault(F_TIMEOUT);
+  }
+
+  if (prev_phase == PHASE_REFLOW && profile.current_phase == PHASE_COOLDOWN && fault == F_NONE) {
     reflow_cycles_count++;
     cfg_save = true;
   }
@@ -1466,10 +1472,10 @@ void setup() {
 #endif
 
   #if defined(ESP32)
-  // Настраиваем LEDC Канал 1 на частоту 5 кГц (бесшумный ШИМ для кулера)
-  ledcSetup(1, 5000, 8); // Канал 1, 5 кГц, 8 бит (0-255)
+  // Стандарт Intel 25 кГц (ультразвуковой бесшумный ШИМ кулера)
+  ledcSetup(1, 25000, 8); // Канал 1, 25 кГц, 8 бит (0-255)
   ledcAttachPin(PIN_FAN, 1);
-  ledcWrite(1, 0);       // Кулер выключен со старта
+  ledcWrite(1, 0);        // Кулер выключен со старта
 
   pinMode(PIN_BTN_BACK, INPUT_PULLUP);
   pinMode(PIN_BTN_CONF, INPUT_PULLUP);
