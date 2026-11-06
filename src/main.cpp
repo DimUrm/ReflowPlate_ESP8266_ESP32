@@ -874,11 +874,10 @@ void drawOled() {
                fan_active, profile.name, PHASE_NAMES[profile.current_phase], 
                fault, buzzer.mute, oled_sleeping, temp_valid);
   return;
-#else
+#elif defined(DISPLAY_SSD1306)
   if (ota_percent >= 0) { drawOtaProgress(); return; }
   if (menuActive()) { menuDraw(); return; } // Меню на OLED SSD1306
   display.clearDisplay();
-#endif
 
   display.setTextSize(1);
   display.setCursor(2, 2);
@@ -944,6 +943,7 @@ void drawOled() {
   }
 
   display.display();
+#endif
 }
 
 // ================= WEB SERIAL CONSOLE (TASMOTA STYLE) =================
@@ -1020,9 +1020,7 @@ void handleConsoleCommand(const String& cmd_raw) {
 #endif
   }
   else if (cmd == "oledtest") {
-#if (defined(DISPLAY_ST7789) || defined(DISPLAY_NOKIA5110)) && defined(ESP32)
-    consoleLog("[OLED] Command unavailable: SPI Display is active.");
-#else
+#if defined(DISPLAY_SSD1306)
     consoleLog("[OLED] Running hardware fill test (White screen, Contrast 255)...");
     display.ssd1306_command(SSD1306_DISPLAYON);
     display.ssd1306_command(SSD1306_SETCONTRAST);
@@ -1030,12 +1028,12 @@ void handleConsoleCommand(const String& cmd_raw) {
     display.fillScreen(SSD1306_WHITE);
     display.display();
     consoleLog("[OLED] Sent. Did the screen light up white?");
+#else
+    consoleLog("[OLED] Command unavailable: OLED SSD1306 is not configured.");
 #endif
   }
   else if (cmd == "oledsh") {
-#if (defined(DISPLAY_ST7789) || defined(DISPLAY_NOKIA5110)) && defined(ESP32)
-    consoleLog("[OLED] Command unavailable: SPI Display is active.");
-#else
+#if defined(DISPLAY_SSD1306)
     consoleLog("[OLED] Forcing SH1106 (1.3 inch) initialization sequence...");
     display.ssd1306_command(0xAE);
     display.ssd1306_command(0xAD);
@@ -1046,6 +1044,8 @@ void handleConsoleCommand(const String& cmd_raw) {
     display.fillScreen(SSD1306_WHITE);
     display.display();
     consoleLog("[OLED] SH1106 sequence sent.");
+#else
+    consoleLog("[OLED] Command unavailable: OLED SSD1306 is not configured.");
 #endif
   }
   else if (cmd == "status") {
