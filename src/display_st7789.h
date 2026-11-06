@@ -228,11 +228,19 @@ inline void drawUI_ST7789(float current_t, float target_t, float power, bool hea
   display.setTextColor(ssr ? C_RED : C_GRAY, C_BLACK);
   display.print(ssr ? "[SSR: ON ] " : "[SSR: OFF] ");
 
+  extern uint8_t sensor; // Берём текущий активный тип датчика из main.cpp
+
   display.setTextColor(fan ? C_CYAN : C_GRAY, C_BLACK);
   display.print(fan ? "[FAN: ON ] " : "[FAN: OFF] ");
 
   display.setTextColor(C_GRAY, C_BLACK);
-  display.print(valid ? "K-TYPE " : "DISCON ");
+  if (!valid) {
+    display.print("DISCON ");
+  } else {
+    if (sensor == SN_MAX)      display.print("K-TYPE ");
+    else if (sensor == SN_NTC) display.print("NTC    ");
+    else                       display.print("SIM    ");
+  }
 }
 
 inline void drawOtaST7789(int percent) {
