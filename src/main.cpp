@@ -1526,11 +1526,6 @@ void setup() {
           return;
         }
 
-        // Проверка MD5 из заголовка (если передано от GitHub)
-        const AsyncWebParameter* pm = request->getParam("md5");
-        if (pm && pm->value().length() == 32) {
-          Update.setMD5(pm->value().c_str());
-        }
         resetActivityTimer();
         ota_percent = 0;
       }
