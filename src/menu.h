@@ -370,7 +370,7 @@ void menuDraw() {
 void drawSplash() {}
 void drawOtaProgress() {}
 
-#else
+#elif defined(DISPLAY_SSD1306)
 // ==================== МЕНЮ ДЛЯ МОНОХРОМНОГО OLED SSD1306 (128x64) ====================
 static void menuTitle(const char* t) {
   display.fillRect(0, 0, 128, 11, SSD1306_WHITE);
@@ -515,6 +515,11 @@ void drawOtaProgress() {
   display.setCursor(16, 54); display.print("Do not power off!");
   display.display();
 }
+#else
+// ==================== РЕЖИМ HEADLESS (БЕЗ ЭКРАНА) ====================
+void menuDraw() {}
+void drawSplash() {}
+void drawOtaProgress() {}
 #endif
 
 // Вызывается из loop(): таймаут меню, перерисовка по событию, сброс зависшей загрузки прошивки
