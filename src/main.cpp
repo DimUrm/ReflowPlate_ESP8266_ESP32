@@ -688,8 +688,8 @@ void pollInputs(uint32_t now) {
 
       if (fault != F_NONE) {
         fault = F_NONE; // Мгновенный сброс аварии
-      } else if (is_heating) {
-        stopHeating();  // Мгновенный аварийный стоп ТЭНа
+      } else if (is_heating || profile.is_active) {
+        stopHeating();  // Мгновенный стоп ТЭНа или активного профиля (включая фазу остывания)
       } else if (menuActive()) {
         menuPress();    // Выбор пункта меню (OK)
       } else {
