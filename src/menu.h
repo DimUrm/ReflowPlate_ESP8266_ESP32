@@ -255,8 +255,8 @@ void menuDraw() {
     default: break;
   }
 }
-void drawSplash() {}
-void drawOtaProgress() {}
+void drawSplash() { drawSplashST7789(); }
+void drawOtaProgress() { drawOtaST7789(ota_percent); }
 
 #elif defined(DISPLAY_NOKIA5110) && defined(ESP32)
 // ==================== МЕНЮ ДЛЯ МОНОХРОМНОГО NOKIA 5110 (84x48) ====================
@@ -367,8 +367,8 @@ void menuDraw() {
   }
   display.display();
 }
-void drawSplash() {}
-void drawOtaProgress() {}
+void drawSplash() { drawSplashNokia(); }
+void drawOtaProgress() { drawOtaNokia(ota_percent); }
 
 #elif defined(DISPLAY_SSD1306)
 // ==================== МЕНЮ ДЛЯ МОНОХРОМНОГО OLED SSD1306 (128x64) ====================
