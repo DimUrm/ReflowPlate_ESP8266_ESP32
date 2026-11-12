@@ -1622,8 +1622,13 @@ void loop() {
     #endif
   }
 
-  // ВО ВРЕМЯ ПРОШИВКИ (OTA) ЗАМОРАЖИВАЕМ ВСЕ ТОРМОЗЯЩИЕ ЗАДАЧИ!
+  // ВО ВРЕМЯ ПРОШИВКИ (OTA) ОБНОВЛЯЕМ ЭКРАН И ЗАМОРАЖИВАЕМ ОСТАЛЬНЫЕ ЗАДАЧИ:
   if (ota_percent >= 0) {
+    static int last_drawn_pct = -1;
+    if (ota_percent != last_drawn_pct) {
+      last_drawn_pct = ota_percent;
+      drawOtaProgress(); // Отрисовывает прогресс-бар на текущем активном экране
+    }
     delay(1);
     return;
   }
