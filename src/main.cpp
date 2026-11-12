@@ -1531,10 +1531,36 @@ void setup() {
       if (!index) {
         stopHeating();
         Serial.printf("[OTA] Start raw binary upload. Total size: %u bytes\n", total);
+
+        // 1. Проверка минимального размера пакета и стандартного Magic Byte
+        if (len < 16 || data[0] != 0xE9) {
+          Serial.println(F("[OTA] Rejected: Invalid firmware magic byte (not 0xE9)!"));
+          Update.setError(UPDATE_ERROR_MAGIC_BYTE);
+          return;
+        }
+
+        // 2. Аппаратная проверка целевого микроконтроллера (защита от чужого чипа)
+#if defined(ESP8266)
+        // У бинарника ESP8266 адрес сегмента IRAM 0x4010xxxx (байт 11 = 0x40, байт 10 = 0x10)
+        if (data[11] != 0x40 || data[10] != 0x10) {
+          Serial.println(F("[OTA] Rejected: Firmware is compiled for ESP32, cannot flash to ESP8266!"));
+          Update.setError(UPDATE_ERROR_MAGIC_BYTE);
+          return;
+        }
+#elif defined(ESP32)
+        // У бинарника ESP32 по смещению 12..13 записан chip_id == 0x0000 (ESP32 Classic)
+        uint16_t chip_id = data[12] | (data[13] << 8);
+        if (chip_id != 0x0000 || data[11] == 0x40) {
+          Serial.println(F("[OTA] Rejected: Firmware is compiled for ESP8266, cannot flash to ESP32!"));
+          Update.setError(UPDATE_ERROR_MAGIC_BYTE);
+          return;
+        }
+#endif
         
         uint32_t maxSpace = ESP.getFreeSketchSpace();
         if (total > maxSpace) {
           Serial.println(F("[OTA] Error: File is too large for free sketch space!"));
+          Update.setError(UPDATE_ERROR_SPACE);
           return;
         }
 
