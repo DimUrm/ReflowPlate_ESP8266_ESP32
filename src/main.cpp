@@ -436,7 +436,7 @@ void startAutoTune() {
   tune_t_high = 0.0f;
   tune_relay_high = true;
   tune_t1 = millis();
-  heat_start = millis(); // ИСПРАВЛЕНИЕ: Сбрасываем heat_start, чтобы не было моментального TIMEOUT!
+  heat_start = millis(); 
   is_heating = true;
   output_power = 100.0f;
   strlcpy(profile.name, "Tune", sizeof(profile.name));
@@ -506,9 +506,9 @@ bool startHeating() {
   if (fault != F_NONE || !temp_valid) return false;
   pidReset();
   is_heating = true;
-  standby_state = STBY_ACTIVE; // ИСПРАВЛЕНИЕ: Сбрасываем standby_state в активное состояние
+  standby_state = STBY_ACTIVE; 
   heat_start = millis();
-  resetActivityTimer();        // ИСПРАВЛЕНИЕ: Будим дисплей
+  resetActivityTimer();        
   buzzer.play(SND_CLICK);
   return true;
 }
@@ -688,7 +688,7 @@ void pollInputs(uint32_t now) {
   if (r_sw != last_sw) { last_sw = r_sw; t_sw = now; }
   if (now - t_sw > 40 && r_sw != stable_sw) {
     stable_sw = r_sw;
-    if (stable_sw == LOW) { // Срабатывание сразу в момент нажатия вниз!
+    if (stable_sw == LOW) { // Срабатывание сразу в момент нажатия!
       resetActivityTimer();
       buzzer.play(SND_CLICK);
 
@@ -738,7 +738,7 @@ void pollInputs(uint32_t now) {
     }
 #endif
 
-    // ===== КНОПКА BACK: СРАБАТЫВАНИЕ СРАЗУ НА НАЖАТИЕ ВНИЗ =====
+    // ===== КНОПКА BACK: СРАБАТЫВАНИЕ СРАЗУ НА НАЖАТИЕ =====
     if (btn_back == LOW && last_btn_back == HIGH) {
       resetActivityTimer();
       buzzer.play(SND_CLICK);
