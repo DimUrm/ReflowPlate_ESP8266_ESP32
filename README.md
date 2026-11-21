@@ -108,5 +108,6 @@
    #define DISPLAY_ST7789       // Цветной IPS ST7789
    //#define DISPLAY_NOKIA5110  // Ретро LCD Nokia 5110
    //#define DISPLAY_SSD1306    // Монохромный OLED
+   ```
 Выберите нужное окружение (env:esp32dev или env:nodemcuv2) и нажмите Build (✓).
 Прошейте контроллер кабелем через порт USB.
