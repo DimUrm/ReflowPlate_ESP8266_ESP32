@@ -1498,7 +1498,7 @@ void setup() {
 
   pinMode(PIN_BTN_BACK, INPUT_PULLUP);
   pinMode(PIN_BTN_CONF, INPUT_PULLUP);
-  Serial.println(F("[HW] ESP32 Mode: Hardware PWM Fan (5kHz) & Direct GPIOs configured."));
+  Serial.println(F("[HW] ESP32 Mode: Hardware PWM Fan (25kHz) & Direct GPIOs configured."));
 #else
   pcf_found = initPCF8574();
   Serial.printf("PCF8574 Expander: %s (Addr: 0x%02X)\n", pcf_found ? "found" : "not found", pcf_address);
