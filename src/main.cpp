@@ -344,11 +344,17 @@ uint8_t readNtc(float &t) {
    // Проверка короткого замыкания термистора на землю (0 Ом)
 #if defined(ESP32)
   if (avg < 15.0f) return SS_OPEN;
-  // Обработка аппаратного насыщения АЦП ESP32 при R_fixed=4.7k (холодный стол <= 32°C):
+  // Насыщение АЦП ESP32 при R_fixed=4.7k (холодный стол <= 32°C) не отличить от обрыва NTC.
+  // Пока нагрев не идёт, считаем «холодным» (25°C). Если насыщение держится 45 с ВО ВРЕМЯ нагрева, это обрыв.
+  static uint32_t sat_since = 0;
   if (avg >= 4080.0f) {
-    t = 25.0f; // Фиксируем безопасную комнатную температуру до прогрева
+    if (!is_heating) sat_since = 0;                          // таймер идёт только во время нагрева
+    else if (!sat_since) sat_since = millis();
+    if (sat_since && millis() - sat_since > 45000UL) return SS_OPEN;
+    t = 25.0f;
     return SS_OK;
   }
+  sat_since = 0;
 #else
   // На ESP8266 с калиброванным ADC_FULL_V=3.2V шкала честная до 1023:
   if (avg < 5.0f || avg > 1020.0f) return SS_OPEN;
@@ -1630,6 +1636,12 @@ void loop() {
 
   // ВО ВРЕМЯ ПРОШИВКИ (OTA) ОБНОВЛЯЕМ ЭКРАН И ЗАМОРАЖИВАЕМ ОСТАЛЬНЫЕ ЗАДАЧИ:
   if (ota_percent >= 0) {
+    if (ota_percent < 100 && now - ota_last_chunk > 15000UL) {   // загрузка оборвалась (Wi-Fi, закрытая вкладка)
+      Update.end(false);                                         // сбрасывает состояние Updater
+      ota_percent = -1;                                          // снимаем заморозку loop()
+      Serial.println(F("[OTA] Timeout: upload aborted"));
+      return;
+    }
     static int last_drawn_pct = -1;
     if (ota_percent != last_drawn_pct) {
       last_drawn_pct = ota_percent;
